@@ -13,6 +13,10 @@ Agenda pessoal e profissional para manter compromissos pessoais (PF) e profissio
 - Importação assistida de compromissos guardados no armazenamento local legado.
 - Layout responsivo e PWA instalável. O service worker armazena somente arquivos da interface; os dados da agenda não ficam disponíveis offline.
 
+## Acesso privado hospedado
+
+A interface está disponível em [Tu Agendando](https://tu-agendando-thiago.th91.chatgpt.site) para o proprietário autorizado. No primeiro uso, selecione **Criar uma conta**, confirme o e-mail se solicitado e entre para salvar seus compromissos no Supabase. Nesta hospedagem estática, a conexão com o Google Agenda ainda não está ativa; a integração OAuth descrita abaixo depende do servidor local e das credenciais do Google.
+
 ## Executar localmente
 
 Requer Node.js 22 ou superior.
