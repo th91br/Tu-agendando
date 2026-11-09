@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#102a43"><meta name="description" content="Sua agenda pessoal e profissional, organizada com seguran�a.">
+<title>Tu Agendando</title>
+<link rel="icon" href="/icon.svg"><link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/style.css">
+<script src="/config.js"></script><script src="/app.js" type="module"></script>
+</head>
+<body>
+<section id="auth-screen" class="auth-screen"><div class="auth-card"><img class="auth-logo" src="/brand-logo.png" alt="Tu Agendando"><h1 id="auth-title">Entre na sua agenda</h1><p id="auth-description">Acesse seus compromissos pessoais e profissionais com seguran�a.</p><form id="auth-form"><label>E-mail<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label><label>Senha<input id="auth-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label><p id="auth-message" class="auth-message" role="alert" hidden></p><button id="auth-submit" class="create" type="submit">Entrar</button></form><button id="auth-toggle" class="auth-toggle" type="button">Criar uma conta</button></div></section><div class="shell" id="shell" data-screen="dashboard" hidden>
+<header class="top">
+  <a class="brand" href="/" aria-label="Tu Agendando"><img class="brand-logo" src="/brand-logo.png" alt="Tu Agendando"></a>
+  <label class="search"><span data-icon="search"></span><input id="search" type="search" placeholder="Buscar nos pr�ximos 7 dias" aria-label="Buscar nos pr�ximos 7 dias"></label>
+  <div class="account-tools"><span id="user-email"></span><button class="integration" id="google"><span data-icon="cloud"></span><span id="google-label">Google Agenda</span></button><button class="sign-out" id="sign-out" type="button">Sair</button></div>
+</header>
+<div class="layout">
+<aside class="sidebar" aria-label="Calend�rio e filtros">
+  <section class="panel mini" aria-label="Mini calend�rio">
+    <div class="mini-head"><strong id="mini-title"></strong><div class="arrows"><button type="button" id="mini-back" aria-label="M�s anterior" data-icon="left"></button><button type="button" id="mini-next" aria-label="Pr�ximo m�s" data-icon="right"></button></div></div>
+    <div class="mini-grid" id="mini"></div>
+  </section>
+  <section class="panel filters"><h2>Minhas agendas</h2><div id="filters">
+    <label><input type="checkbox" value="pf" checked><i class="dot pf"></i>Pessoal <small>PF</small></label>
+    <label><input type="checkbox" value="pj" checked><i class="dot pj"></i>Profissional <small>PJ</small></label>
+    <label><input type="checkbox" value="" checked><i class="dot unassigned"></i>Sem categoria</label>
+  </div></section>
+  <section class="upcoming"><h2>Pr�ximo compromisso</h2><div id="upcoming"></div></section>
+</aside>
+<main>
+  <nav class="main-nav" aria-label="Navega��o principal">
+    <button id="dashboard-tab" aria-current="page">Painel</button>
+    <button id="calendar-tab">Calend�rio</button>
+  </nav>
+  <section id="dashboard-screen" class="dashboard-screen" aria-labelledby="dashboard-title">
+    <div class="dashboard-heading">
+      <div><h1 id="dashboard-title">Sua agenda</h1><p id="dashboard-date"></p></div>
+      <button class="create" id="dashboard-new"><span data-icon="plus"></span><span>Novo compromisso</span></button>
+    </div>
+    <p id="dashboard-warning" class="warning" role="status" hidden></p>
+    <div class="dashboard-layout">
+      <section class="dashboard-main" aria-label="Compromissos de hoje">
+        <div class="next-appointment" id="next-appointment"></div>
+        <section class="today-section">
+          <div class="section-heading"><div><h2>Hoje</h2><p id="today-date"></p></div><button id="today-calendar">Abrir calend�rio</button></div>
+          <div id="today-events"></div>
+        </section>
+      </section>
+      <section class="week-section" aria-labelledby="week-title">
+        <div class="section-heading"><div><h2 id="week-title">Pr�ximos 7 dias</h2><p>Selecione um dia para ver a agenda.</p></div></div>
+        <div id="week-strip"></div>
+      </section>
+    </div>
+  </section>
+  <section id="calendar-screen" class="calendar-screen" hidden>
+  <div class="panel toolbar">
+    <div><h1 id="range"></h1><p id="subtitle">Calend�rio de compromissos</p></div>
+    <button class="create" id="new"><span data-icon="plus"></span><span>Novo compromisso</span></button>
+  </div>
+  <div class="panel calendar">
+    <div class="calendar-top">
+      <div class="navigation"><button id="back" aria-label="Per�odo anterior" data-icon="left"></button><button id="today">Hoje</button><button id="forward" aria-label="Pr�ximo per�odo" data-icon="right"></button></div>
+      <div class="views" aria-label="Visualiza��o"><button data-view="day">Dia</button><button data-view="week">Semana</button><button data-view="month">M�s</button></div>
+    </div>
+    <p id="warning" class="warning" role="status" hidden></p>
+    <p id="calendar-hint" class="calendar-hint"></p>
+    <div id="calendar" aria-label="Compromissos"></div>
+  </div>
+  <footer><span>Hor�rio de Bras�lia</span><button id="reload"><span data-icon="refresh"></span> Atualizar agenda</button></footer>
+  </section>
+</main>
+</div>
+</div>
+<dialog id="editor" aria-labelledby="editor-title"><form id="event-form">
+  <div class="dialog-head"><div><h2 id="editor-title"></h2><p id="source"></p></div><button type="button" data-close="editor" aria-label="Fechar" data-icon="close"></button></div>
+  <label>T�tulo<input name="title" required maxlength="180" autocomplete="off" autofocus></label>
+  <fieldset><legend>Agenda</legend><div class="categories"><label><input required type="radio" name="category" value="pf"><i class="dot pf"></i>Pessoal � PF</label><label><input required type="radio" name="category" value="pj"><i class="dot pj"></i>Profissional � PJ</label></div></fieldset>
+  <label class="check"><input type="checkbox" name="allDay"> Dia inteiro</label>
+  <div class="dates"><label>In�cio<input name="start" required></label><label id="end-label"><span>Fim</span><input name="end" required></label></div>
+  <label>Local<input name="location" maxlength="300"></label>
+  <label>Observa��es<textarea name="notes" rows="2" maxlength="4000"></textarea></label>
+  <p id="form-message" class="warning" role="alert" hidden></p>
+  <div class="dialog-actions"><button class="danger" type="button" id="delete" hidden>Excluir</button><button type="button" data-close="editor">Cancelar</button><button class="create" id="save">Salvar</button></div>
+</form></dialog>
+<dialog id="settings" aria-labelledby="settings-title"><div class="settings">
+  <div class="dialog-head"><h2 id="settings-title">Google Agenda</h2><button type="button" data-close="settings" aria-label="Fechar" data-icon="close"></button></div>
+  <p id="google-info"></p><p id="google-error" class="warning" role="alert" hidden></p><p id="legacy-info" class="legacy-info" hidden></p>
+  <div class="dialog-actions"><button id="install" hidden>Instalar aplicativo</button><button id="legacy-import" type="button" hidden>Importar compromissos antigos</button><button class="create" id="connect"></button></div>
+</div></dialog>
+<p id="notice" role="status" class="toast" hidden></p>
+</body></html>
+
+
