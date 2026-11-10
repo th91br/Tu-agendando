@@ -9,14 +9,29 @@
 <script src="/config.js"></script><script src="/app.js" type="module"></script>
 </head>
 <body>
-<section id="auth-screen" class="auth-screen"><div class="auth-card"><img class="auth-logo" src="/brand-logo.png" alt="Tu Agendando"><h1 id="auth-title">Entre na sua agenda</h1><p id="auth-description">Acesse seus compromissos pessoais e profissionais com segurança.</p><form id="auth-form"><label>E-mail<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label><label>Senha<input id="auth-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label><p id="auth-message" class="auth-message" role="alert" hidden></p><button id="auth-submit" class="create" type="submit">Entrar</button></form><button id="auth-toggle" class="auth-toggle" type="button">Criar uma conta</button></div></section><div class="shell" id="shell" data-screen="dashboard" hidden>
+<section id="auth-screen" class="auth-screen"><div class="auth-card">
+  <img class="auth-logo" src="/brand-logo.png" alt="Tu Agendando">
+  <h1 id="auth-title">Entre na sua agenda</h1>
+  <p id="auth-description">Acesse seus compromissos pessoais e profissionais com segurança.</p>
+  <form id="auth-form">
+    <label>E-mail<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label>
+    <label id="auth-password-label">Senha
+      <span class="password-field"><input id="auth-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"><button id="password-visibility" type="button" aria-label="Mostrar senha" aria-pressed="false" data-icon="eye"></button></span>
+    </label>
+    <label id="auth-confirm-label" hidden>Confirme a nova senha<input id="auth-confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128"></label>
+    <button id="auth-recover" class="text-action" type="button">Esqueci minha senha</button>
+    <p id="auth-message" class="auth-message" role="status" hidden></p>
+    <button id="auth-submit" class="create" type="submit">Entrar</button>
+  </form>
+  <button id="auth-toggle" class="auth-toggle" type="button">Criar uma conta</button>
+</div></section><div class="shell" id="shell" data-screen="dashboard" hidden>
 <header class="top">
   <a class="brand" href="/" aria-label="Tu Agendando"><img class="brand-logo" src="/brand-logo.png" alt="Tu Agendando"></a>
   <label class="search"><span data-icon="search"></span><input id="search" type="search" placeholder="Buscar nos próximos 7 dias" aria-label="Buscar nos próximos 7 dias"></label>
   <div class="account-tools"><span id="user-email"></span><button class="integration" id="google"><span data-icon="cloud"></span><span id="google-label">Google Agenda</span></button><button class="sign-out" id="sign-out" type="button">Sair</button></div>
 </header>
 <div class="layout">
-<aside class="sidebar" aria-label="Calendário e filtros">
+<aside class="sidebar" id="calendar-sidebar" aria-label="Calendário e filtros">
   <section class="panel mini" aria-label="Mini calendário">
     <div class="mini-head"><strong id="mini-title"></strong><div class="arrows"><button type="button" id="mini-back" aria-label="Mês anterior" data-icon="left"></button><button type="button" id="mini-next" aria-label="Próximo mês" data-icon="right"></button></div></div>
     <div class="mini-grid" id="mini"></div>
@@ -30,6 +45,7 @@
 </aside>
 <main>
   <nav class="main-nav" aria-label="Navegação principal">
+    <button id="sidebar-toggle" type="button" class="sidebar-toggle" aria-controls="calendar-sidebar" aria-expanded="true" aria-label="Recolher coluna lateral" data-icon="panel"></button>
     <button id="dashboard-tab" aria-current="page">Painel</button>
     <button id="calendar-tab">Calendário</button>
   </nav>
@@ -80,9 +96,22 @@
   <div class="dates"><label>Início<input name="start" required></label><label id="end-label"><span>Fim</span><input name="end" required></label></div>
   <label>Local<input name="location" maxlength="300"></label>
   <label>Observações<textarea name="notes" rows="2" maxlength="4000"></textarea></label>
+  <div id="editor-attendance-row" class="editor-attendance-row" hidden><span>Situação</span><button id="editor-attendance" type="button" class="status-trigger"></button></div>
   <p id="form-message" class="warning" role="alert" hidden></p>
   <div class="dialog-actions"><button class="danger" type="button" id="delete" hidden>Excluir</button><button type="button" data-close="editor">Cancelar</button><button class="create" id="save">Salvar</button></div>
 </form></dialog>
+<dialog id="attendance-dialog" aria-labelledby="attendance-title"><div class="attendance-panel">
+  <div class="dialog-head"><h2 id="attendance-title">Situação do compromisso</h2><button type="button" data-close="attendance-dialog" aria-label="Fechar" data-icon="close"></button></div>
+  <p id="attendance-event-title"></p>
+  <div class="attendance-options">
+    <button type="button" data-attendance="scheduled">Planejado</button>
+    <button type="button" data-attendance="completed">Concluído</button>
+    <button type="button" data-attendance="missed">Faltei</button>
+    <button type="button" data-attendance="no_show">Não compareceu</button>
+    <button type="button" data-attendance="rescheduled">Remarcado</button>
+  </div>
+  <p id="attendance-error" class="warning" role="alert" hidden></p>
+</div></dialog>
 <dialog id="settings" aria-labelledby="settings-title"><div class="settings">
   <div class="dialog-head"><h2 id="settings-title">Google Agenda</h2><button type="button" data-close="settings" aria-label="Fechar" data-icon="close"></button></div>
   <p id="google-info"></p><p id="google-error" class="warning" role="alert" hidden></p><p id="legacy-info" class="legacy-info" hidden></p>

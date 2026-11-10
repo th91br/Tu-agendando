@@ -1,6 +1,7 @@
 import {
   accessToken, callRpc, deleteRows, getUser, importRows, insertRows, isConfigured,
-  selectRows, signIn, signOut, signUp, updateRows,
+  selectRows, signIn, signOut, signUp, updateRows, consumeRecoveryLink,
+  requestPasswordReset, updateRecoveryPassword,
 } from './supabase.js';
 
 const $ = id => document.getElementById(id);
@@ -10,6 +11,9 @@ const icons = {
   left: '<path d="m14 6-6 6 6 6"/>', right: '<path d="m10 6 6 6-6 6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', close: '<path d="m6 6 12 12m0-12L6 18"/>',
   refresh: '<path d="M20 6v5h-5M4 18v-5h5"/><path d="M5 9a8 8 0 0 1 13-4l2 6M4 13l2 6a8 8 0 0 0 13-4"/>',
+  eye: '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/>',
+  eyeOff: '<path d="M3 3l18 18M9.8 5.8A11 11 0 0 1 12 6c6.4 0 10 6 10 6a16 16 0 0 1-3.2 3.7M6 6.7C3.4 8.2 2 12 2 12s3.6 6 10 6c1.2 0 2.3-.2 3.3-.5"/>',
+  panel: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
 };
 for (const el of document.querySelectorAll('[data-icon]')) {
   el.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + icons[el.dataset.icon] + '</svg>';
@@ -57,7 +61,11 @@ let selected = today(), miniMonth = monthStep(selected, 0);
 let view = 'week', screen = 'dashboard', events = [], active = null, draftId = null, status = { ready: false, connected: false };
 let user = null, calendars = {}, googleLinkId = null, legacyCount = 0, authMode = 'signin';
 let request = 0, noticeTimer, installPrompt, loaded = false, currentWindow = '';
-let deleteArmed = false;
+let deleteArmed = false, pendingStatus = 'scheduled', attendanceEvent = null;
+const attendanceNames = {
+  scheduled: 'Planejado', completed: 'Concluído', missed: 'Faltei',
+  no_show: 'Não compareceu', rescheduled: 'Remarcado',
+};
 const categoryNames = { pf: 'PF', pj: 'PJ', '': 'Sem categoria' };
 const daysOfWeek = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const editor = $('editor'), form = $('event-form'), field = name => form.elements.namedItem(name);
@@ -111,6 +119,7 @@ function dbEvent(event, id, extra = {}) {
     source: extra.source || 'local', sync_status: extra.syncStatus || 'local_only',
     google_link_id: extra.googleLinkId || null, google_event_id: extra.googleEventId || null,
     google_etag: extra.googleEtag || null, last_sync_error: extra.lastSyncError || null,
+    attendance_status: event.attendanceStatus || 'scheduled',
   };
 }
 function fromDb(row) {
@@ -123,7 +132,7 @@ function fromDb(row) {
     title: row.title, category: row.category, start: allDay ? clock(row.start_at).slice(0, 10) : row.start_at,
     end: allDay ? clock(row.end_at).slice(0, 10) : row.end_at, allDay,
     notes: row.notes || '', location: row.location || '', etag: row.google_etag || row.etag,
-    recurring: false, locked: false,
+    recurring: false, locked: false, attendanceStatus: row.attendance_status || 'scheduled',
   };
 }
 function fromGoogle(remote, row = null) {
@@ -136,6 +145,7 @@ function fromGoogle(remote, row = null) {
     start: remote.start, end: remote.end, allDay: remote.allDay,
     notes: remote.notes || '', location: remote.location || '', etag: remote.etag,
     recurring: remote.recurring, locked: remote.locked,
+    attendanceStatus: row?.attendance_status || 'scheduled',
   };
 }
 async function ensureGoogleLink() {
@@ -286,6 +296,18 @@ function showDashboard() {
   $('search').setAttribute('aria-label', 'Buscar nos próximos 7 dias');
   load();
 }
+function updateSidebarToggle() {
+  const collapsed = $('shell').dataset.sidebarCollapsed === 'true';
+  const label = collapsed ? 'Mostrar coluna lateral' : 'Recolher coluna lateral';
+  $('sidebar-toggle').setAttribute('aria-expanded', String(!collapsed));
+  $('sidebar-toggle').setAttribute('aria-label', label);
+  $('sidebar-toggle').title = label;
+}
+$('sidebar-toggle').onclick = () => {
+  $('shell').dataset.sidebarCollapsed = String($('shell').dataset.sidebarCollapsed !== 'true');
+  updateSidebarToggle();
+};
+updateSidebarToggle();
 function visible() {
   const query = $('search').value.trim().toLocaleLowerCase('pt-BR');
   const enabled = [...document.querySelectorAll('#filters input:checked')].map(el => el.value);
@@ -305,6 +327,10 @@ function eventButton(e) {
   const density = duration < 60 ? ' short-event' : duration < 90 ? ' medium-event' : '';
   const el = button('', () => openEditor(e), 'event ' + e.category + density);
   el.append(make('strong', '', e.title), make('small', '', labelTime(e) + ' · ' + categoryNames[e.category]));
+  el.dataset.attendance = e.attendanceStatus || 'scheduled';
+  if (e.attendanceStatus && e.attendanceStatus !== 'scheduled') {
+    el.append(make('span', 'event-status', attendanceNames[e.attendanceStatus]));
+  }
   el.setAttribute('aria-label', e.title + ', ' + labelTime(e) + ', ' + categoryNames[e.category]);
   el.title = e.title + ' · ' + categoryNames[e.category];
   return el;
@@ -453,17 +479,23 @@ function dashboardEvent(e, dateLabel = '') {
   const category = make('span', 'category-label ' + (e.category || 'unassigned'),
     e.category ? categoryNames[e.category] : 'Sem categoria');
   item.append(heading, detail, category);
-  return item;
+  const row = make('div', 'dashboard-event-row');
+  row.dataset.attendance = e.attendanceStatus || 'scheduled';
+  const action = button(attendanceNames[e.attendanceStatus || 'scheduled'], () => showAttendance(e), 'status-trigger');
+  action.setAttribute('aria-label', 'Situação de ' + e.title + ': ' + attendanceNames[e.attendanceStatus || 'scheduled']);
+  row.append(item, action);
+  return row;
 }
 function renderDashboard() {
   const day = today();
   const items = visible();
+  const upcomingItems = items.filter(e => !['completed', 'missed', 'no_show'].includes(e.attendanceStatus));
   const days = seven(day);
   const todayItems = items.filter(e => eventOn(e, day));
-  const running = items.find(e => !e.allDay &&
+  const running = upcomingItems.find(e => !e.allDay &&
     Date.parse(e.start) <= Date.now() && Date.parse(e.end) > Date.now());
-  const allDayRunning = items.find(e => e.allDay && e.start <= day && day < e.end);
-  const next = running || allDayRunning || items.find(e => e.allDay
+  const allDayRunning = upcomingItems.find(e => e.allDay && e.start <= day && day < e.end);
+  const next = running || allDayRunning || upcomingItems.find(e => e.allDay
     ? e.start >= day && e.start < shift(day, 8)
     : Date.parse(e.end) > Date.now() && clock(e.start).slice(0, 10) < shift(day, 8));
 
@@ -491,6 +523,8 @@ function renderDashboard() {
       ...(next.location ? [make('span', '', next.location)] : []),
     );
     nextPanel.append(nextButton);
+    nextPanel.append(button('Situação: ' + attendanceNames[next.attendanceStatus || 'scheduled'],
+      () => showAttendance(next), 'next-status'));
   } else {
     nextPanel.append(make('p', 'next-empty',
       loaded ? 'Nenhum compromisso nos próximos 7 dias.' : 'Carregando sua agenda…'));
@@ -539,7 +573,8 @@ function render() {
   for (const el of document.querySelectorAll('[data-view]')) el.setAttribute('aria-pressed', el.dataset.view === view);
   const items = visible();
   $('subtitle').textContent = !loaded ? 'Carregando agenda…' : items.length === 1 ? '1 compromisso no período' : items.length + ' compromissos no período';
-  const next = items.find(e => e.allDay ? e.start >= today() : Date.parse(e.start) >= Date.now());
+  const next = items.find(e => !['completed', 'missed', 'no_show'].includes(e.attendanceStatus) &&
+    (e.allDay ? e.start >= today() : Date.parse(e.start) >= Date.now()));
   $('upcoming').replaceChildren(next ? button(next.title + ' · ' + labelTime(next), () => openEditor(next)) :
     make('p', '', 'Nenhum compromisso à frente neste período.'));
   $('calendar-hint').textContent = view === 'month' ? 'Selecione um dia para marcar.' : 'Selecione um horário na grade para marcar.';
@@ -554,6 +589,7 @@ function setDateFields(allDay, start, end) {
 }
 function openEditor(event = null, day = selected, startMinute = 9 * 60) {
   active = event;
+  pendingStatus = event?.attendanceStatus || 'scheduled';
   draftId = crypto.randomUUID();
   deleteArmed = false;
   form.reset();
@@ -576,11 +612,68 @@ function openEditor(event = null, day = selected, startMinute = 9 * 60) {
   setDateFields(field('allDay').checked, event ? event.allDay ? event.start : clock(event.start) : slotTime(day, startMinute),
     event ? event.allDay ? shift(event.end, -1) : clock(event.end) : slotTime(day, startMinute + slotMinutes));
   $('delete').hidden = !event || locked;
+  $('editor-attendance-row').hidden = !event;
+  $('editor-attendance').textContent = attendanceNames[pendingStatus];
   $('delete').textContent = 'Excluir';
   $('save').hidden = locked;
   message('form-message', '');
   editor.showModal();
 }
+$('editor-attendance').onclick = () => showAttendance(active);
+function showAttendance(event) {
+  if (!event) return;
+  attendanceEvent = event;
+  $('attendance-event-title').textContent = event.title;
+  message('attendance-error', '');
+  for (const item of document.querySelectorAll('.attendance-options button[data-attendance]')) {
+    item.setAttribute('aria-pressed',
+      item.dataset.attendance === (event === active && editor.open ? pendingStatus : event.attendanceStatus || 'scheduled'));
+  }
+  $('attendance-dialog').showModal();
+}
+async function saveAttendance(event, value) {
+  if (event.dbId) {
+    const saved = await updateRows('events', {
+      id: 'eq.' + event.dbId, user_id: 'eq.' + user.id, etag: 'eq.' + event.dbEtag,
+    }, { attendance_status: value });
+    if (!saved.length) throw new Error('Este compromisso mudou. Atualize a agenda e tente novamente.');
+  } else if (event.googleEventId) {
+    const category = calendars[event.category] ? event.category : 'pf';
+    const link = await ensureGoogleLink();
+    const body = {
+      title: event.title, category, start: event.start, end: event.end,
+      allDay: event.allDay, location: event.location, notes: event.notes, attendanceStatus: value,
+    };
+    await insertRows('events', [dbEvent(body, crypto.randomUUID(), {
+      source: 'google', syncStatus: 'synced', googleLinkId: link,
+      googleEventId: event.googleEventId, googleEtag: event.googleEtag,
+    })]);
+  } else throw new Error('Não foi possível identificar o compromisso.');
+}
+for (const choice of document.querySelectorAll('button[data-attendance]')) choice.onclick = async () => {
+  const event = attendanceEvent;
+  const value = choice.dataset.attendance;
+  if (value === 'rescheduled') {
+    if (event.locked) { message('attendance-error', 'Este compromisso não pode ser remarcado aqui.'); return; }
+    $('attendance-dialog').close();
+    if (!editor.open || active !== event) openEditor(event);
+    pendingStatus = 'rescheduled';
+    $('editor-attendance').textContent = attendanceNames.rescheduled;
+    message('form-message', 'Altere a data ou o horário e salve para remarcar.');
+    field('start').focus();
+    return;
+  }
+  choice.disabled = true;
+  message('attendance-error', '');
+  try {
+    await saveAttendance(event, value);
+    $('attendance-dialog').close();
+    if (editor.open) editor.close();
+    notify('Situação atualizada: ' + attendanceNames[value] + '.');
+    await load();
+  } catch (error) { message('attendance-error', error.message); }
+  finally { choice.disabled = false; }
+};
 function busy(value) {
   $('save').disabled = $('delete').disabled = value;
   for (const el of editor.querySelectorAll('[data-close]')) el.disabled = value;
@@ -660,10 +753,16 @@ form.addEventListener('submit', async e => {
   const allDay = field('allDay').checked;
   const body = {
     title: field('title').value, category: field('category').value, notes: field('notes').value,
-    location: field('location').value, allDay, start: allDay ? field('start').value : iso(field('start').value),
+    location: field('location').value, allDay, attendanceStatus: pendingStatus,
+    start: allDay ? field('start').value : iso(field('start').value),
     end: allDay ? shift(field('end').value, 1) : iso(field('end').value) };
   if (!body.start || !body.end || body.start >= body.end) {
     message('form-message', 'Confira o intervalo. O fim precisa ser posterior ao início.');
+    return;
+  }
+  if (active && active.attendanceStatus !== 'rescheduled' && pendingStatus === 'rescheduled' &&
+      body.start === active.start && body.end === active.end) {
+    message('form-message', 'Para remarcar, escolha uma nova data ou horário.');
     return;
   }
   busy(true);
@@ -774,14 +873,42 @@ const outcome = new URLSearchParams(location.search).get('google');
 if (outcome) history.replaceState(null, '', '/');
 function setAuthMode(mode) {
   authMode = mode;
-  $('auth-title').textContent = mode === 'signup' ? 'Crie sua conta' : 'Entre na sua agenda';
-  $('auth-description').textContent = mode === 'signup'
-    ? 'Seus compromissos pessoais e profissionais ficam privados na sua conta.'
-    : 'Acesse sua agenda pessoal e profissional com segurança.';
-  $('auth-submit').textContent = mode === 'signup' ? 'Criar conta' : 'Entrar';
-  $('auth-toggle').textContent = mode === 'signup' ? 'Já tenho uma conta' : 'Criar uma conta';
-  $('auth-password').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+  const recovering = mode === 'recover', resetting = mode === 'reset';
+  $('auth-title').textContent = recovering ? 'Recuperar senha' : resetting ? 'Crie uma nova senha' :
+    mode === 'signup' ? 'Crie sua conta' : 'Entre na sua agenda';
+  $('auth-description').textContent = recovering
+    ? 'Enviaremos um link de recuperação para o seu e-mail.'
+    : resetting ? 'Escolha uma nova senha para sua conta.'
+      : mode === 'signup' ? 'Seus compromissos pessoais e profissionais ficam privados na sua conta.'
+        : 'Acesse sua agenda pessoal e profissional com segurança.';
+  $('auth-submit').textContent = recovering ? 'Enviar link' : resetting ? 'Salvar nova senha' :
+    mode === 'signup' ? 'Criar conta' : 'Entrar';
+  $('auth-toggle').textContent = mode === 'signin' ? 'Criar uma conta' :
+    mode === 'signup' ? 'Já tenho uma conta' : 'Voltar ao login';
+  $('auth-email').closest('label').hidden = resetting;
+  $('auth-email').required = !resetting;
+  $('auth-password-label').hidden = recovering;
+  $('auth-password').required = !recovering;
+  $('auth-confirm-label').hidden = !resetting;
+  $('auth-confirm').required = resetting;
+  $('auth-recover').hidden = mode !== 'signin';
+  $('auth-password').autocomplete = mode === 'signup' || resetting ? 'new-password' : 'current-password';
+  $('auth-password').type = 'password';
+  $('password-visibility').setAttribute('aria-pressed', 'false');
+  $('password-visibility').setAttribute('aria-label', 'Mostrar senha');
+  $('password-visibility').querySelector('svg').innerHTML = icons.eye;
 }
+$('password-visibility').onclick = () => {
+  const visible = $('auth-password').type === 'password';
+  $('auth-password').type = visible ? 'text' : 'password';
+  $('password-visibility').setAttribute('aria-pressed', String(visible));
+  $('password-visibility').setAttribute('aria-label', visible ? 'Ocultar senha' : 'Mostrar senha');
+  $('password-visibility').querySelector('svg').innerHTML = icons[visible ? 'eyeOff' : 'eye'];
+};
+$('auth-recover').onclick = () => {
+  setAuthMode('recover');
+  message('auth-message', '');
+};
 async function startApp(account) {
   user = account;
   events = [];
@@ -907,6 +1034,23 @@ $('auth-form').addEventListener('submit', async event => {
   try {
     const email = $('auth-email').value.trim().toLowerCase();
     const password = $('auth-password').value;
+    if (authMode === 'recover') {
+      await requestPasswordReset(email);
+      message('auth-message', 'Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha.');
+      return;
+    }
+    if (authMode === 'reset') {
+      if (password !== $('auth-confirm').value) {
+        message('auth-message', 'As senhas não coincidem.');
+        return;
+      }
+      await updateRecoveryPassword(password);
+      $('auth-password').value = '';
+      $('auth-confirm').value = '';
+      setAuthMode('signin');
+      message('auth-message', 'Senha atualizada. Entre com a nova senha.');
+      return;
+    }
     const result = authMode === 'signup' ? await signUp(email, password) : await signIn(email, password);
     if (result.confirmationRequired) {
       setAuthMode('signin');
@@ -937,6 +1081,7 @@ $('sign-out').onclick = async () => {
   message('auth-message', '');
 };
 $('legacy-import').onclick = importLegacy;
-if (!isConfigured()) message('auth-message', 'A autenticação ainda precisa ser configurada no arquivo .env.');
+if (consumeRecoveryLink()) setAuthMode('reset');
+else if (!isConfigured()) message('auth-message', 'A autenticação ainda precisa ser configurada no arquivo .env.');
 else if (getUser()) startApp(getUser());
 

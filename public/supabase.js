@@ -3,6 +3,7 @@ const baseUrl = String(config.url || '').replace(/\/$/, '');
 const publishableKey = String(config.publishableKey || '');
 const sessionKey = 'tu-agendando.auth.session.v1';
 let current = restore();
+let recoveryToken = null;
 
 function restore() {
   try {
@@ -76,6 +77,28 @@ export async function signUp(email, password) {
     return { user: current.user, confirmationRequired: false };
   }
   return { user: value.user || null, confirmationRequired: true };
+}
+export async function requestPasswordReset(email) {
+  await authRequest('recover?redirect_to=' + encodeURIComponent(location.origin + '/'), { email });
+}
+export function consumeRecoveryLink() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  if (params.get('type') !== 'recovery' || !params.get('access_token')) return false;
+  recoveryToken = params.get('access_token');
+  history.replaceState(null, '', location.pathname + location.search);
+  return true;
+}
+export async function updateRecoveryPassword(password) {
+  if (!recoveryToken) throw new Error('O link expirou. Solicite outro e-mail de recuperação.');
+  let response;
+  try {
+    response = await fetch(baseUrl + '/auth/v1/user', {
+      method: 'PUT', headers: jsonHeaders(recoveryToken),
+      body: JSON.stringify({ password }), cache: 'no-store',
+    });
+  } catch { throw new Error('Sem conexão com o serviço de autenticação.'); }
+  await readResponse(response);
+  recoveryToken = null;
 }
 async function renew() {
   if (!current?.refresh_token) { clear(); throw new Error('Sua sess�o expirou. Entre novamente.'); }

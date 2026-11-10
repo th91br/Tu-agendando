@@ -1,4 +1,4 @@
-const cacheName = 'tu-agendando-v5';
+const cacheName = 'tu-agendando-v6';
 const shell = ['/', '/style.css', '/app.js', '/supabase.js', '/brand-logo.png', '/icon.svg', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 self.addEventListener('install', event => event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(shell))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys
