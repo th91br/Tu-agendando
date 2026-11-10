@@ -169,7 +169,7 @@ dialog{width:min(510px,calc(100% - 24px));max-height:calc(100dvh - 24px);border:
   .shell[data-screen=calendar][data-sidebar-collapsed=true] .layout{display:flex}
   .main-nav{gap:3px}
 }
-@media(max-width:475px){
+@media(max-width:600px){
   .top{display:grid;grid-template-columns:1fr;gap:5px;padding:10px 0}
   .top .brand{grid-row:1;justify-self:start}
   .brand .brand-logo{width:clamp(205px,60vw,248px);height:auto;max-height:75px}
