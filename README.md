@@ -23,6 +23,6 @@ Para Google no servidor local, crie um cliente OAuth Web no Google Cloud e adici
 
 ## Dados antigos e limites
 
-O servidor local mantém `%LOCALAPPDATA%\AgendaAqui\agenda.json` para a importação assistida dos registros antigos. Funções da Vercel não acessam esse arquivo: na hospedagem, a importação local aparece como indisponível. Importe no servidor local com a mesma conta Supabase antes ou depois da publicação; os eventos importados aparecem no ambiente hospedado após autenticar. A sessão do navegador no endereço antigo não é transferida para o novo domínio; entre novamente.
+O servidor local mantém `%LOCALAPPDATA%\TuAgendando\agenda.json` para a importação assistida dos registros antigos. Funções da Vercel não acessam esse arquivo: na hospedagem, a importação local aparece como indisponível. Importe no servidor local com a mesma conta Supabase antes ou depois da publicação; os eventos importados aparecem no ambiente hospedado após autenticar. A sessão do navegador no endereço antigo não é transferida para o novo domínio; entre novamente.
 
 O serviço Google não opera até que as credenciais OAuth, o domínio definitivo e os segredos de produção sejam configurados. A agenda PF/PJ funciona com as variáveis públicas do Supabase. O projeto ainda não tem testes de ponta a ponta num domínio Vercel publicado.

@@ -9,7 +9,7 @@ const redirect = origin + '/oauth/callback';
 const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || '';
 const data = resolve(process.env.AGENDA_DATA_DIR || process.env.LOCALAPPDATA || 'data',
-  process.env.AGENDA_DATA_DIR || !process.env.LOCALAPPDATA ? '' : 'AgendaAqui');
+  process.env.AGENDA_DATA_DIR || !process.env.LOCALAPPDATA ? '' : 'TuAgendando');
 mkdirSync(data, { recursive: true, mode: 0o700 });
 const db = resolve(data, 'agenda.json');
 let state;
@@ -53,10 +53,10 @@ async function currentUser(req) {
       headers: { apikey: publishableKey, Authorization: 'Bearer ' + bearer },
       signal: AbortSignal.timeout(10000), cache: 'no-store',
     });
-  } catch { fail(503, 'N�o foi poss�vel validar sua sess�o.'); }
-  if (!response.ok) fail(401, 'Sua sess�o expirou. Entre novamente.');
+  } catch { fail(503, 'Não foi possível validar sua sessão.'); }
+  if (!response.ok) fail(401, 'Sua sessão expirou. Entre novamente.');
   const profile = await response.json();
-  if (!profile.id) fail(401, 'Sua sess�o expirou. Entre novamente.');
+  if (!profile.id) fail(401, 'Sua sessão expirou. Entre novamente.');
   const user = { id: profile.id, email: profile.email || '' };
   verifiedUsers.set(bearer, { user, until: Date.now() + 45000 });
   return user;
@@ -67,7 +67,7 @@ async function tokenRequest(fields) {
     body: new URLSearchParams({ client_id: googleClientId, client_secret: googleClientSecret, ...fields }),
     signal: AbortSignal.timeout(12000), cache: 'no-store',
   });
-  if (!response.ok) fail(502, 'A autoriza��o do Google expirou ou falhou. Reconecte sua conta.');
+  if (!response.ok) fail(502, 'A autorização do Google expirou ou falhou. Reconecte sua conta.');
   return response.json();
 }
 async function accessToken(userId) {
@@ -96,16 +96,16 @@ async function google(userId, path = '', options = {}) {
     signal: AbortSignal.timeout(12000), cache: 'no-store',
   });
   if (response.status === 412) fail(409, 'Este compromisso mudou no Google. Atualize a agenda e abra o evento novamente.');
-  if ([404, 410].includes(response.status)) fail(404, 'O compromisso j� foi removido ou n�o est� dispon�vel.');
-  if (response.status === 401) fail(409, 'A autoriza��o do Google expirou. Reconecte sua conta.');
-  if (!response.ok) fail(502, 'O Google Agenda n�o concluiu a opera��o. Tente novamente.');
+  if ([404, 410].includes(response.status)) fail(404, 'O compromisso já foi removido ou não está disponível.');
+  if (response.status === 401) fail(409, 'A autorização do Google expirou. Reconecte sua conta.');
+  if (!response.ok) fail(502, 'O Google Agenda não concluiu a operação. Tente novamente.');
   return response.status === 204 ? null : response.json();
 }
 function normalize(event) {
   const rawCategory = event.extendedProperties?.private?.tuAgendandoCategory ||
-    event.extendedProperties?.private?.agendaAquiCategory;
+    event.extendedProperties?.private?.tuAgendandoCategory;
   return {
-    id: event.id, source: 'google', etag: event.etag, title: event.summary || '(Sem t�tulo)',
+    id: event.id, source: 'google', etag: event.etag, title: event.summary || '(Sem título)',
     category: ['pf', 'pj'].includes(rawCategory) ? rawCategory : '',
     start: event.start.dateTime || event.start.date, end: event.end.dateTime || event.end.date,
     allDay: Boolean(event.start.date), notes: event.description || '', location: event.location || '',
@@ -121,7 +121,7 @@ async function listGoogle(userId, from, to) {
     if (!result.nextPageToken) return events;
     query.set('pageToken', result.nextPageToken);
   } while (events.length < 10000);
-  fail(502, 'H� muitos compromissos neste per�odo. Escolha um intervalo menor.');
+  fail(502, 'Há muitos compromissos neste período. Escolha um intervalo menor.');
 }
 
 const day = /^\d{4}-\d{2}-\d{2}$/;
@@ -139,7 +139,7 @@ function eventFields(event) {
       !validDate(event.end, allDay) || event.start >= event.end ||
       typeof event.notes !== 'string' || event.notes.length > 4000 ||
       typeof event.location !== 'string' || event.location.length > 300) {
-    fail(400, 'Confira o t�tulo, a categoria, o local e os hor�rios.');
+    fail(400, 'Confira o título, a categoria, o local e os horários.');
   }
   return { title: event.title.trim(), category: event.category, start: event.start, end: event.end,
     allDay, notes: event.notes, location: event.location };
@@ -152,16 +152,16 @@ function googleFields(event) {
   };
 }
 async function jsonBody(req) {
-  if (!req.headers['content-type']?.startsWith('application/json')) fail(415, 'Formato inv�lido.');
+  if (!req.headers['content-type']?.startsWith('application/json')) fail(415, 'Formato inválido.');
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 32000) fail(413, 'Solicita��o muito longa.');
+    if (size > 32000) fail(413, 'Solicitação muito longa.');
     chunks.push(chunk);
   }
   try { return JSON.parse(Buffer.concat(chunks)); }
-  catch { fail(400, 'Formato inv�lido.'); }
+  catch { fail(400, 'Formato inválido.'); }
 }
 let writes = Promise.resolve();
 function write(action) {
@@ -196,12 +196,12 @@ const server = createServer(async (req, res) => {
   };
   const move = path => { res.writeHead(303, { Location: path }); res.end(); };
   try {
-    if (req.headers.host !== 'localhost:' + port) fail(403, 'Abra pelo endere�o localhost.');
+    if (req.headers.host !== 'localhost:' + port) fail(403, 'Abra pelo endereço localhost.');
     const url = new URL(req.url, origin);
     const { pathname: path, searchParams: params } = url;
     const method = req.method;
-    if (method !== 'GET' && req.headers.origin !== origin) fail(403, 'Origem inv�lida.');
-    if (req.headers['sec-fetch-site'] === 'cross-site' && path !== '/' && path !== '/oauth/callback') fail(403, 'Origem inv�lida.');
+    if (method !== 'GET' && req.headers.origin !== origin) fail(403, 'Origem inválida.');
+    if (req.headers['sec-fetch-site'] === 'cross-site' && path !== '/' && path !== '/oauth/callback') fail(403, 'Origem inválida.');
 
     if (method === 'GET' && path === '/config.js') {
       const config = { url: readyForSupabase() ? supabaseUrl : '', publishableKey: readyForSupabase() ? publishableKey : '' };
@@ -227,14 +227,14 @@ const server = createServer(async (req, res) => {
         await write(async () => {
           const result = await tokenRequest({ code: params.get('code'), code_verifier: pending.verifier,
             grant_type: 'authorization_code', redirect_uri: redirect });
-          if (!result.refresh_token || !result.scope?.split(' ').includes(calendarScope)) fail(409, 'Permiss�o insuficiente.');
+          if (!result.refresh_token || !result.scope?.split(' ').includes(calendarScope)) fail(409, 'Permissão insuficiente.');
           let email = '';
           try {
             const identity = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
               headers: { Authorization: 'Bearer ' + result.access_token }, signal: AbortSignal.timeout(8000), cache: 'no-store',
             });
             if (identity.ok) email = (await identity.json()).email || '';
-          } catch { /* O acesso � agenda n�o depende da leitura do e-mail. */ }
+          } catch { /* O acesso à agenda não depende da leitura do e-mail. */ }
           const googleTokens = { ...(state.googleTokens || {}), [pending.userId]: { refreshToken: result.refresh_token, email } };
           save({ ...state, googleTokens });
           accessCache.delete(pending.userId);
@@ -282,7 +282,7 @@ const server = createServer(async (req, res) => {
       const user = await currentUser(req);
       const from = params.get('from'), to = params.get('to');
       if (!validDate(from, false) || !validDate(to, false) || Date.parse(to) - Date.parse(from) > 50 * 86400000 || from >= to) {
-        fail(400, 'Per�odo inv�lido.');
+        fail(400, 'Período inválido.');
       }
       return reply({ events: await listGoogle(user.id, from, to) });
     }
@@ -290,7 +290,7 @@ const server = createServer(async (req, res) => {
       const user = await currentUser(req);
       const body = await jsonBody(req);
       const event = eventFields(body);
-      if (typeof body.id !== 'string' || !/^[a-f0-9]{32}$/.test(body.id)) fail(400, 'Identificador inv�lido.');
+      if (typeof body.id !== 'string' || !/^[a-f0-9]{32}$/.test(body.id)) fail(400, 'Identificador inválido.');
       let saved;
       try {
         saved = await google(user.id, '', { method: 'POST', body: { ...googleFields(event), id: body.id } });
@@ -323,23 +323,23 @@ const server = createServer(async (req, res) => {
     }
     if (path === '/api/legacy/claim' && method === 'POST') {
       const user = await currentUser(req);
-      if (state.legacyImportedUserId && state.legacyImportedUserId !== user.id) fail(409, 'Os dados antigos j� foram vinculados a outra conta.');
+      if (state.legacyImportedUserId && state.legacyImportedUserId !== user.id) fail(409, 'Os dados antigos já foram vinculados a outra conta.');
       return reply({ events: Array.isArray(state.events) ? state.events : [] });
     }
     if (path === '/api/legacy/complete' && method === 'POST') {
       const user = await currentUser(req);
       const body = await jsonBody(req);
-      if (!Number.isInteger(body.count) || body.count !== (state.events || []).length) fail(409, 'A importa��o n�o foi conclu�da. Tente novamente.');
+      if (!Number.isInteger(body.count) || body.count !== (state.events || []).length) fail(409, 'A importação não foi concluída. Tente novamente.');
       await write(async () => {
-        if (state.legacyImportedUserId && state.legacyImportedUserId !== user.id) fail(409, 'Os dados antigos j� foram vinculados a outra conta.');
+        if (state.legacyImportedUserId && state.legacyImportedUserId !== user.id) fail(409, 'Os dados antigos já foram vinculados a outra conta.');
         save({ ...state, legacyImportedUserId: user.id });
       });
       return reply({});
     }
 
-    fail(404, 'P�gina n�o encontrada.');
+    fail(404, 'Página não encontrada.');
   } catch (error) {
-    if (!res.headersSent) reply({ error: error.status ? error.message : 'N�o foi poss�vel concluir a opera��o.' }, error.status || 500);
+    if (!res.headersSent) reply({ error: error.status ? error.message : 'Não foi possível concluir a operação.' }, error.status || 500);
   }
 });
 server.listen(port, 'localhost', () => console.log('Tu Agendando em ' + origin));
