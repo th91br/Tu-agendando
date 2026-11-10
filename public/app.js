@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 11014)
-Total output lines: 943
-
 import {
   accessToken, callRpc, deleteRows, getUser, importRows, insertRows, isConfigured,
   selectRows, signIn, signOut, signUp, updateRows,
@@ -62,7 +59,7 @@ let user = null, calendars = {}, googleLinkId = null, legacyCount = 0, authMode 
 let request = 0, noticeTimer, installPrompt, loaded = false, currentWindow = '';
 let deleteArmed = false;
 const categoryNames = { pf: 'PF', pj: 'PJ', '': 'Sem categoria' };
-const daysOfWeek = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'S�b', 'Dom'];
+const daysOfWeek = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const editor = $('editor'), form = $('event-form'), field = name => form.elements.namedItem(name);
 const calendar = $('calendar');
 const compact = window.matchMedia('(max-width: 820px)');
@@ -97,7 +94,7 @@ async function api(path, method = 'GET', body) {
   });
   const data = await result.json().catch(() => ({}));
   if (!result.ok) {
-    const error = new Error(data.error || 'N�o foi poss�vel concluir a opera��o.');
+    const error = new Error(data.error || 'Não foi possível concluir a operação.');
     error.status = result.status;
     throw error;
   }
@@ -105,7 +102,7 @@ async function api(path, method = 'GET', body) {
 }
 function dbEvent(event, id, extra = {}) {
   const calendar = calendars[event.category];
-  if (!calendar) throw new Error('A agenda PF ou PJ n�o est� inicializada. Saia e entre novamente.');
+  if (!calendar) throw new Error('A agenda PF ou PJ não está inicializada. Saia e entre novamente.');
   return {
     id, user_id: user.id, calendar_id: calendar.id, category: event.category,
     title: event.title.trim(), start_at: event.allDay ? iso(wallTime(event.start)) : event.start,
@@ -160,7 +157,7 @@ async function ensureGoogleLink() {
   } else {
     connection = (await insertRows('google_connections', [connectionValues]))[0];
   }
-  if (!connection?.id) throw new Error('N�o foi poss�vel registrar a conex�o do Google.');
+  if (!connection?.id) throw new Error('Não foi possível registrar a conexão do Google.');
   const links = await selectRows('google_calendar_links', {
     select: 'id', user_id: 'eq.' + user.id, connection_id: 'eq.' + connection.id,
     external_calendar_id: 'eq.primary', limit: '1',
@@ -178,7 +175,7 @@ async function ensureGoogleLink() {
     }]);
     googleLinkId = inserted[0]?.id || null;
   }
-  if (!googleLinkId) throw new Error('N�o foi poss�vel registrar o calend�rio do Google.');
+  if (!googleLinkId) throw new Error('Não foi possível registrar o calendário do Google.');
   return googleLinkId;
 }
 function googleBodyFromRow(row) {
@@ -247,12 +244,12 @@ async function load() {
         events = [...remote, ...rows.filter(row => !row.google_event_id || !remoteIds.has(row.google_event_id)).map(fromDb)];
       } catch (error) {
         if (key !== request) return;
-        message('warning', 'Agenda salva; n�o foi poss�vel atualizar o Google agora. ' + error.message);
+        message('warning', 'Agenda salva; não foi possível atualizar o Google agora. ' + error.message);
       }
     }
   } catch (error) {
     if (key !== request) return;
-    message('warning', error instanceof TypeError ? 'Sem conex�o com a agenda. Verifique se o Tu Agendando est� em execu��o.' : error.message);
+    message('warning', error instanceof TypeError ? 'Sem conexão com a agenda. Verifique se o Tu Agendando está em execução.' : error.message);
   }
   loaded = true;
   render();
@@ -273,8 +270,8 @@ function showCalendar(day = selected, nextView = 'day') {
   $('calendar-screen').hidden = false;
   $('dashboard-tab').removeAttribute('aria-current');
   $('calendar-tab').setAttribute('aria-current', 'page');
-  $('search').placeholder = 'Buscar neste per�odo';
-  $('search').setAttribute('aria-label', 'Buscar neste per�odo');
+  $('search').placeholder = 'Buscar neste período';
+  $('search').setAttribute('aria-label', 'Buscar neste período');
   load();
 }
 function showDashboard() {
@@ -285,8 +282,8 @@ function showDashboard() {
   $('dashboard-screen').hidden = false;
   $('calendar-tab').removeAttribute('aria-current');
   $('dashboard-tab').setAttribute('aria-current', 'page');
-  $('search').placeholder = 'Buscar nos pr�ximos 7 dias';
-  $('search').setAttribute('aria-label', 'Buscar nos pr�ximos 7 dias');
+  $('search').placeholder = 'Buscar nos próximos 7 dias';
+  $('search').setAttribute('aria-label', 'Buscar nos próximos 7 dias');
   load();
 }
 function visible() {
@@ -301,15 +298,15 @@ function eventOn(e, day) {
     : Date.parse(e.start) < Date.parse(iso(wallTime(shift(day, 1)))) && Date.parse(e.end) > Date.parse(iso(wallTime(day)));
 }
 function labelTime(e) {
-  return e.allDay ? 'Dia inteiro' : clock(e.start).slice(11) + ' - ' + clock(e.end).slice(11);
+  return e.allDay ? 'Dia inteiro' : clock(e.start).slice(11) + ' – ' + clock(e.end).slice(11);
 }
 function eventButton(e) {
   const duration = e.allDay ? 1440 : Math.max(0, (Date.parse(e.end) - Date.parse(e.start)) / 60000);
   const density = duration < 60 ? ' short-event' : duration < 90 ? ' medium-event' : '';
   const el = button('', () => openEditor(e), 'event ' + e.category + density);
-  el.append(make('strong', '', e.title), make('small', '', labelTime(e) + ' � ' + categoryNames[e.category]));
+  el.append(make('strong', '', e.title), make('small', '', labelTime(e) + ' · ' + categoryNames[e.category]));
   el.setAttribute('aria-label', e.title + ', ' + labelTime(e) + ', ' + categoryNames[e.category]);
-  el.title = e.title + ' � ' + categoryNames[e.category];
+  el.title = e.title + ' · ' + categoryNames[e.category];
   return el;
 }
 function mini() {
@@ -326,7 +323,7 @@ function mini() {
 }
 function dayHeader(days, dayPicker) {
   const header = make('div', 'week-head' + (dayPicker ? ' day-picker' : ''));
-  if (!dayPicker) header.append(make('span', '', 'GMT-3'));
+  if (!dayPicker) header.append(make('span', '', 'GMT−3'));
   for (const day of days) {
     const el = button('', () => {
       if (!dayPicker) return openEditor(null, day);
@@ -334,7 +331,7 @@ function dayHeader(days, dayPicker) {
       render();
       calendar.querySelector('.day-picker [aria-pressed=true]')?.focus();
     }, day === today() ? 'current' : '');
-    el.setAttribute('aria-label', (dayPicker ? 'Ver hor�rios de ' : 'Novo compromisso em ') + format(day, { dateStyle: 'full' }));
+    el.setAttribute('aria-label', (dayPicker ? 'Ver horários de ' : 'Novo compromisso em ') + format(day, { dateStyle: 'full' }));
     if (dayPicker) el.setAttribute('aria-pressed', day === selected);
     el.append(make('small', '', format(day, { weekday: 'short' }).replace('.', '')), make('b', '', day.slice(-2)));
     header.append(el);
@@ -352,7 +349,7 @@ function timeSlots(day) {
     const time = timeLabel(minute);
     const item = button('', () => openEditor(null, day, minute), 'time-slot');
     item.append(make('span', '', time));
-    item.setAttribute('aria-label', 'Novo compromisso em ' + dateLabel + ' �s ' + time);
+    item.setAttribute('aria-label', 'Novo compromisso em ' + dateLabel + ' às ' + time);
     item.tabIndex = minute === 8 * 60 ? 0 : -1;
     slots.append(item);
   }
@@ -425,7 +422,7 @@ function timeline(items) {
   }
   const scroll = make('div', 'week-scroll');
   scroll.setAttribute('tabindex', '0');
-  scroll.setAttribute('aria-label', 'Grade de hor�rios');
+  scroll.setAttribute('aria-label', 'Grade de horários');
   scroll.append(grid);
   const old = calendar.querySelector('.week-scroll')?.scrollTop;
   const header = view === 'day' ? [] : [dayHeader(weekDays, singleDay)];
@@ -441,7 +438,94 @@ function month(items) {
     const dateButton = button(day.slice(-2), () => openEditor(null, day), 'date-btn' + (day === today() ? ' current' : ''));
     dateButton.setAttribute('aria-label', 'Novo compromisso em ' + format(day, { dateStyle: 'full' }));
     cell.append(dateButton);
-    const matches = items.…1014 tokens truncated…render() {
+    const matches = items.filter(e => eventOn(e, day));
+    cell.append(...matches.slice(0, 2).map(eventButton));
+    if (matches.length > 2) cell.append(button('+' + (matches.length - 2), () => choose(day, 'day'), 'more'));
+    grid.append(cell);
+  }
+  calendar.replaceChildren(grid);
+}
+function dashboardEvent(e, dateLabel = '') {
+  const item = button('', () => openEditor(e), 'dashboard-event');
+  const heading = make('strong', '', e.title);
+  const detail = make('span', 'dashboard-event-detail',
+    [dateLabel, labelTime(e), e.location].filter(Boolean).join(' · '));
+  const category = make('span', 'category-label ' + (e.category || 'unassigned'),
+    e.category ? categoryNames[e.category] : 'Sem categoria');
+  item.append(heading, detail, category);
+  return item;
+}
+function renderDashboard() {
+  const day = today();
+  const items = visible();
+  const days = seven(day);
+  const todayItems = items.filter(e => eventOn(e, day));
+  const running = items.find(e => !e.allDay &&
+    Date.parse(e.start) <= Date.now() && Date.parse(e.end) > Date.now());
+  const allDayRunning = items.find(e => e.allDay && e.start <= day && day < e.end);
+  const next = running || allDayRunning || items.find(e => e.allDay
+    ? e.start >= day && e.start < shift(day, 8)
+    : Date.parse(e.end) > Date.now() && clock(e.start).slice(0, 10) < shift(day, 8));
+
+  $('dashboard-date').textContent = cap(format(day, { dateStyle: 'full' }));
+  $('today-date').textContent = cap(format(day, { dateStyle: 'full' }));
+  $('dashboard-warning').textContent = loaded ? $('warning').textContent : '';
+  $('dashboard-warning').hidden = !loaded || !$('warning').textContent;
+
+  const nextPanel = $('next-appointment');
+  nextPanel.classList.toggle('in-progress', Boolean(running || allDayRunning));
+  nextPanel.replaceChildren();
+  const nextLabel = make('span', 'next-label',
+    running || allDayRunning ? 'Em andamento' : 'Próximo compromisso');
+  nextPanel.append(nextLabel);
+  if (next) {
+    const nextButton = button('', () => openEditor(next), 'next-event');
+    nextButton.append(
+      make('strong', '', next.title),
+      make('span', '', [
+        next.allDay ? cap(format(next.start, { weekday: 'long', day: 'numeric', month: 'long' })) :
+          clock(next.start).slice(0, 10) === day ? 'Hoje' :
+            cap(format(clock(next.start).slice(0, 10), { weekday: 'long', day: 'numeric', month: 'long' })),
+        labelTime(next), categoryNames[next.category],
+      ].join(' · ')),
+      ...(next.location ? [make('span', '', next.location)] : []),
+    );
+    nextPanel.append(nextButton);
+  } else {
+    nextPanel.append(make('p', 'next-empty',
+      loaded ? 'Nenhum compromisso nos próximos 7 dias.' : 'Carregando sua agenda…'));
+  }
+
+  $('today-events').replaceChildren();
+  $('today-events').classList.toggle('event-list', todayItems.length > 0);
+  if (todayItems.length) {
+    for (const event of todayItems) $('today-events').append(dashboardEvent(event));
+  } else {
+    const empty = make('div', 'dashboard-empty',
+      loaded ? 'Hoje está livre. Seus compromissos novos aparecem aqui.' : 'Carregando os compromissos de hoje…');
+    $('today-events').append(empty);
+  }
+
+  const strip = $('week-strip');
+  strip.replaceChildren();
+  for (const dateIdValue of days) {
+    const dayItems = items.filter(e => eventOn(e, dateIdValue));
+    const buttonDay = button('', () => showCalendar(dateIdValue, 'day'),
+      'week-day' + (dateIdValue === day ? ' is-today' : ''));
+    buttonDay.setAttribute('aria-label',
+      cap(format(dateIdValue, { dateStyle: 'full' })) + ', ' +
+      (dayItems.length === 1 ? '1 compromisso' : dayItems.length + ' compromissos'));
+    buttonDay.append(
+      make('span', 'week-day-name', dateIdValue === day ? 'Hoje' :
+        format(dateIdValue, { weekday: 'short' }).replace('.', '')),
+      make('strong', '', dateIdValue.slice(-2)),
+      make('span', 'week-day-count', dayItems.length ?
+        (dayItems.length === 1 ? '1 compromisso' : dayItems.length + ' compromissos') : 'Livre'),
+    );
+    strip.append(buttonDay);
+  }
+}
+function render() {
   if (screen === 'dashboard') {
     renderDashboard();
     return;
@@ -451,14 +535,14 @@ function month(items) {
   const final = shift(end, -1);
   $('range').textContent = view === 'day' ? cap(format(selected, { dateStyle: 'long' })) :
     view === 'month' ? cap(monthLabel(selected)) :
-      format(start, { day: 'numeric', month: 'short' }).replace('.', '') + ' - ' + format(final, { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '');
+      format(start, { day: 'numeric', month: 'short' }).replace('.', '') + ' – ' + format(final, { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '');
   for (const el of document.querySelectorAll('[data-view]')) el.setAttribute('aria-pressed', el.dataset.view === view);
   const items = visible();
-  $('subtitle').textContent = !loaded ? 'Carregando agenda.' : items.length === 1 ? '1 compromisso no per�odo' : items.length + ' compromissos no per�odo';
+  $('subtitle').textContent = !loaded ? 'Carregando agenda…' : items.length === 1 ? '1 compromisso no período' : items.length + ' compromissos no período';
   const next = items.find(e => e.allDay ? e.start >= today() : Date.parse(e.start) >= Date.now());
-  $('upcoming').replaceChildren(next ? button(next.title + ' � ' + labelTime(next), () => openEditor(next)) :
-    make('p', '', 'Nenhum compromisso � frente neste per�odo.'));
-  $('calendar-hint').textContent = view === 'month' ? 'Selecione um dia para marcar.' : 'Selecione um hor�rio na grade para marcar.';
+  $('upcoming').replaceChildren(next ? button(next.title + ' · ' + labelTime(next), () => openEditor(next)) :
+    make('p', '', 'Nenhum compromisso à frente neste período.'));
+  $('calendar-hint').textContent = view === 'month' ? 'Selecione um dia para marcar.' : 'Selecione um horário na grade para marcar.';
   if (view === 'month') month(items);
   else timeline(items);
 }
@@ -466,7 +550,7 @@ function setDateFields(allDay, start, end) {
   field('start').type = field('end').type = allDay ? 'date' : 'datetime-local';
   field('start').value = start;
   field('end').value = end;
-  $('end-label').querySelector('span').textContent = allDay ? '�ltimo dia' : 'Fim';
+  $('end-label').querySelector('span').textContent = allDay ? 'Último dia' : 'Fim';
 }
 function openEditor(event = null, day = selected, startMinute = 9 * 60) {
   active = event;
@@ -476,10 +560,10 @@ function openEditor(event = null, day = selected, startMinute = 9 * 60) {
   const locked = Boolean(event?.locked);
   for (const el of form.querySelectorAll('input,textarea')) el.disabled = locked;
   $('editor-title').textContent = event ? 'Editar compromisso' : 'Novo compromisso';
-  $('source').textContent = event?.recurring ? 'Altera��o desta ocorr�ncia � Google Agenda' :
-    locked ? 'Este compromisso � gerenciado pelo Google Agenda' :
-      event?.syncStatus === 'error' ? 'Salvo na sua conta; sincroniza��o pendente com o Google' :
-        (event ? event.source === 'google' : status.connected) ? 'Google Agenda � calend�rio principal' : 'Salvo na sua conta';
+  $('source').textContent = event?.recurring ? 'Alteração desta ocorrência · Google Agenda' :
+    locked ? 'Este compromisso é gerenciado pelo Google Agenda' :
+      event?.syncStatus === 'error' ? 'Salvo na sua conta; sincronização pendente com o Google' :
+        (event ? event.source === 'google' : status.connected) ? 'Google Agenda · calendário principal' : 'Salvo na sua conta';
   field('title').value = event?.title || '';
   field('category').value = event?.category || (event ? 'pf' : '');
   if (!event) {
@@ -520,7 +604,7 @@ async function persistEvent(body) {
     const saved = await updateRows('events', {
       id: 'eq.' + active.dbId, user_id: 'eq.' + user.id, etag: 'eq.' + active.dbEtag,
     }, dbEvent(body, active.dbId, extra));
-    if (!saved.length) throw new Error('Este compromisso mudou em outra sess�o. Atualize a agenda e tente novamente.');
+    if (!saved.length) throw new Error('Este compromisso mudou em outra sessão. Atualize a agenda e tente novamente.');
     let row = saved[0];
     if (active.googleEventId && status.connected) {
       try {
@@ -534,7 +618,7 @@ async function persistEvent(body) {
       } catch (error) {
         await updateRows('events', { id: 'eq.' + row.id, user_id: 'eq.' + user.id },
           { sync_status: 'error', last_sync_error: error.message.slice(0, 1000) });
-        return { warning: 'Compromisso salvo na sua conta, mas o Google n�o sincronizou: ' + error.message };
+        return { warning: 'Compromisso salvo na sua conta, mas o Google não sincronizou: ' + error.message };
       }
     }
     return { row };
@@ -548,11 +632,11 @@ async function persistEvent(body) {
       source: 'google', syncStatus: 'synced', googleLinkId: linkId,
       googleEventId: remote.id, googleEtag: remote.etag,
     })]))[0];
-    if (!row) throw new Error('O compromisso foi atualizado no Google, mas n�o p�de ser registrado na sua conta.');
+    if (!row) throw new Error('O compromisso foi atualizado no Google, mas não pôde ser registrado na sua conta.');
     return { row };
   }
   const inserted = (await insertRows('events', [dbEvent(body, draftId)]))[0];
-  if (!inserted) throw new Error('O compromisso n�o foi confirmado pelo banco de dados.');
+  if (!inserted) throw new Error('O compromisso não foi confirmado pelo banco de dados.');
   if (!status.connected) return { row: inserted };
   try {
     const linkId = await ensureGoogleLink();
@@ -563,12 +647,12 @@ async function persistEvent(body) {
       source: 'google', sync_status: 'synced', google_link_id: linkId,
       google_event_id: remote.id, google_etag: remote.etag, last_sync_error: null,
     });
-    if (!synced.length) throw new Error('O evento foi criado no Google, mas o v�nculo n�o foi confirmado.');
+    if (!synced.length) throw new Error('O evento foi criado no Google, mas o vínculo não foi confirmado.');
     return { row: synced[0] };
   } catch (error) {
     await updateRows('events', { id: 'eq.' + inserted.id, user_id: 'eq.' + user.id },
       { sync_status: 'error', last_sync_error: error.message.slice(0, 1000) });
-    return { row: inserted, warning: 'Compromisso salvo na sua conta, mas o Google n�o sincronizou: ' + error.message };
+    return { row: inserted, warning: 'Compromisso salvo na sua conta, mas o Google não sincronizou: ' + error.message };
   }
 }
 form.addEventListener('submit', async e => {
@@ -579,7 +663,7 @@ form.addEventListener('submit', async e => {
     location: field('location').value, allDay, start: allDay ? field('start').value : iso(field('start').value),
     end: allDay ? shift(field('end').value, 1) : iso(field('end').value) };
   if (!body.start || !body.end || body.start >= body.end) {
-    message('form-message', 'Confira o intervalo. O fim precisa ser posterior ao in�cio.');
+    message('form-message', 'Confira o intervalo. O fim precisa ser posterior ao início.');
     return;
   }
   busy(true);
@@ -601,23 +685,23 @@ form.addEventListener('submit', async e => {
 $('delete').onclick = async () => {
   if (!deleteArmed) {
     deleteArmed = true;
-    $('delete').textContent = 'Confirmar exclus�o';
-    message('form-message', 'Excluir este compromisso' + (active.source === 'google' ? ' tamb�m do Google Agenda?' : '?'));
+    $('delete').textContent = 'Confirmar exclusão';
+    message('form-message', 'Excluir este compromisso' + (active.source === 'google' ? ' também do Google Agenda?' : '?'));
     return;
   }
   busy(true);
   try {
     if (active.googleEventId) {
-      if (!status.connected) throw new Error('Reconecte o Google Agenda para excluir tamb�m o compromisso sincronizado.');
+      if (!status.connected) throw new Error('Reconecte o Google Agenda para excluir também o compromisso sincronizado.');
       await api('google/events/' + encodeURIComponent(active.googleEventId), 'DELETE', { etag: active.googleEtag });
     }
     if (active.dbId) {
       const deleted = await deleteRows('events', {
         id: 'eq.' + active.dbId, user_id: 'eq.' + user.id, etag: 'eq.' + active.dbEtag,
       });
-      if (!deleted.length) throw new Error('Este compromisso mudou em outra sess�o. Atualize a agenda e tente novamente.');
+      if (!deleted.length) throw new Error('Este compromisso mudou em outra sessão. Atualize a agenda e tente novamente.');
     }
-    editor.close(); notify('Compromisso exclu�do.'); load();
+    editor.close(); notify('Compromisso excluído.'); load();
   } catch (error) { message('form-message', error.message); }
   finally { busy(false); }
 };
@@ -627,9 +711,9 @@ function settings() {
   $('connect').textContent = status.connected ? 'Desconectar' : 'Conectar ao Google';
   $('connect').disabled = !status.ready;
   $('google-info').textContent = status.connected
-    ? 'Compromissos novos e vinculados s�o sincronizados com seu calend�rio principal. Os dados tamb�m ficam salvos na sua conta Tu Agendando.'
-    : status.ready ? 'Conecte uma conta para sincronizar compromissos com o calend�rio principal. Seus dados ficam salvos na sua conta Tu Agendando.'
-      : 'Configure as credenciais OAuth seguindo o README para ativar a sincroniza��o. A agenda Tu Agendando j� salva seus compromissos na nuvem.';
+    ? 'Compromissos novos e vinculados são sincronizados com seu calendário principal. Os dados também ficam salvos na sua conta Tu Agendando.'
+    : status.ready ? 'Conecte uma conta para sincronizar compromissos com o calendário principal. Seus dados ficam salvos na sua conta Tu Agendando.'
+      : 'Configure as credenciais OAuth seguindo o README para ativar a sincronização. A agenda Tu Agendando já salva seus compromissos na nuvem.';
 }
 $('google').onclick = () => { settings(); $('settings').showModal(); };
 $('connect').onclick = async () => {
@@ -693,9 +777,9 @@ function setAuthMode(mode) {
   $('auth-title').textContent = mode === 'signup' ? 'Crie sua conta' : 'Entre na sua agenda';
   $('auth-description').textContent = mode === 'signup'
     ? 'Seus compromissos pessoais e profissionais ficam privados na sua conta.'
-    : 'Acesse sua agenda pessoal e profissional com seguran�a.';
+    : 'Acesse sua agenda pessoal e profissional com segurança.';
   $('auth-submit').textContent = mode === 'signup' ? 'Criar conta' : 'Entrar';
-  $('auth-toggle').textContent = mode === 'signup' ? 'J� tenho uma conta' : 'Criar uma conta';
+  $('auth-toggle').textContent = mode === 'signup' ? 'Já tenho uma conta' : 'Criar uma conta';
   $('auth-password').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
 }
 async function startApp(account) {
@@ -718,17 +802,17 @@ async function startApp(account) {
       select: 'id,kind,is_default', user_id: 'eq.' + user.id, is_default: 'eq.true',
     });
     calendars = Object.fromEntries(rows.map(row => [row.kind, row]));
-    if (!calendars.pf || !calendars.pj) throw new Error('As agendas pessoal e profissional n�o foram inicializadas.');
+    if (!calendars.pf || !calendars.pj) throw new Error('As agendas pessoal e profissional não foram inicializadas.');
     status = await api('google/status');
     if (status.connected) {
       try { await ensureGoogleLink(); } catch (error) {
-        message('warning', 'O Google est� conectado, mas o v�nculo n�o p�de ser atualizado: ' + error.message);
+        message('warning', 'O Google está conectado, mas o vínculo não pôde ser atualizado: ' + error.message);
       }
-      try { await syncPendingEvents(); } catch { /* Compromissos locais continuam acess�veis. */ }
+      try { await syncPendingEvents(); } catch { /* Compromissos locais continuam acessíveis. */ }
     }
     await refreshLegacy();
     await load();
-    if (outcome) notify(outcome === 'connected' ? 'Google Agenda conectado.' : 'Conex�o com o Google n�o conclu�da.');
+    if (outcome) notify(outcome === 'connected' ? 'Google Agenda conectado.' : 'Conexão com o Google não concluída.');
   } catch (error) {
     loaded = true;
     message('warning', error.message);
@@ -743,9 +827,9 @@ async function refreshLegacy() {
     const button = $('legacy-import');
     info.hidden = legacyCount === 0;
     button.hidden = legacyCount === 0 || result.claimed || result.claimedByCurrentUser;
-    if (result.claimedByCurrentUser) info.textContent = 'Os compromissos antigos deste computador j� foram importados para esta conta.';
-    else if (result.claimed) info.textContent = 'Os compromissos antigos deste computador j� foram vinculados a outra conta.';
-    else if (legacyCount) info.textContent = 'Foram encontrados ' + legacyCount + ' compromissos salvos anteriormente neste computador. Voc� pode import�-los para sua conta.';
+    if (result.claimedByCurrentUser) info.textContent = 'Os compromissos antigos deste computador já foram importados para esta conta.';
+    else if (result.claimed) info.textContent = 'Os compromissos antigos deste computador já foram vinculados a outra conta.';
+    else if (legacyCount) info.textContent = 'Foram encontrados ' + legacyCount + ' compromissos salvos anteriormente neste computador. Você pode importá-los para sua conta.';
   } catch {
     legacyCount = 0;
     $('legacy-info').hidden = true;
@@ -785,7 +869,7 @@ async function importLegacy() {
       const category = ['pf', 'pj'].includes(old.category) ? old.category : 'pf';
       const start = allDay ? String(old.start || '').slice(0, 10) : legacyInstant(old.start);
       const end = allDay ? String(old.end || '').slice(0, 10) : legacyInstant(old.end);
-      if (!start || !end || start >= end) throw new Error('O compromisso antigo ' + (index + 1) + ' tem hor�rio inv�lido.');
+      if (!start || !end || start >= end) throw new Error('O compromisso antigo ' + (index + 1) + ' tem horário inválido.');
       const body = {
         title: String(old.title || 'Compromisso importado').trim().slice(0, 180) || 'Compromisso importado',
         category, start, end, allDay, location: String(old.location || '').slice(0, 300),
@@ -799,7 +883,7 @@ async function importLegacy() {
     await api('legacy/complete', 'POST', { count: oldEvents.length });
     await refreshLegacy();
     $('settings').close();
-    notify(oldEvents.length ? oldEvents.length + ' compromissos importados.' : 'N�o havia compromissos antigos para importar.');
+    notify(oldEvents.length ? oldEvents.length + ' compromissos importados.' : 'Não havia compromissos antigos para importar.');
     await load();
   } catch (error) {
     message('google-error', error.message);
@@ -853,7 +937,6 @@ $('sign-out').onclick = async () => {
   message('auth-message', '');
 };
 $('legacy-import').onclick = importLegacy;
-if (!isConfigured()) message('auth-message', 'A autentica��o ainda precisa ser configurada no arquivo .env.');
+if (!isConfigured()) message('auth-message', 'A autenticação ainda precisa ser configurada no arquivo .env.');
 else if (getUser()) startApp(getUser());
-
 
