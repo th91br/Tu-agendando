@@ -1,2 +1,13 @@
-{"name":"tu-agendando","version":"1.0.0","private":true,"type":"module","engines":{"node":">=22"},"scripts":{"start":"node --env-file-if-exists=.env server.mjs","check":"node --check server.mjs && node --check public/app.js && node --check public/sw.js"}}
-
+{
+  "name": "tu-agendando",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node --test tests/google-api.test.mjs",
+    "build": "npm run check && npm test"
+  }
+}
