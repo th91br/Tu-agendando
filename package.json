@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
     "check": "node scripts/check.mjs",
-    "test": "node --test tests/google-api.test.mjs",
+    "test": "node --test",
     "build": "npm run check && npm test",
     "dev": "node --env-file-if-exists=.env server.mjs"
   }

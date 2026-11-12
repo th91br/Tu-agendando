@@ -3,6 +3,7 @@ import {
   selectRows, signIn, signOut, signUp, updateRows, consumeRecoveryLink,
   requestPasswordReset, updateRecoveryPassword,
 } from './supabase.js';
+import { calendarIcs, overlappingAppointments } from './calendar-utils.js';
 
 const $ = id => document.getElementById(id);
 const icons = {
@@ -62,6 +63,7 @@ let view = 'week', screen = 'dashboard', events = [], active = null, draftId = n
 let user = null, calendars = {}, googleLinkId = null, legacyCount = 0, authMode = 'signin';
 let request = 0, noticeTimer, installPrompt, loaded = false, currentWindow = '';
 let deleteArmed = false, pendingStatus = 'scheduled', attendanceEvent = null;
+let syncPromise = null, lastSyncAttempt = 0;
 const attendanceNames = {
   scheduled: 'Planejado', completed: 'Concluído', missed: 'Faltei',
   no_show: 'Não compareceu', rescheduled: 'Remarcado',
@@ -197,24 +199,62 @@ function googleBodyFromRow(row) {
     notes: row.notes || '', location: row.location || '',
   };
 }
-async function syncPendingEvents() {
-  if (!status.connected || !user) return;
-  const pending = await selectRows('events', {
-    select: '*', user_id: 'eq.' + user.id, sync_status: 'eq.pending',
-    google_event_id: 'not.is.null', limit: '100',
-  });
-  for (const row of pending) {
-    try {
-      const remote = await api('google/events/' + encodeURIComponent(row.google_event_id), 'PATCH', {
-        ...googleBodyFromRow(row), etag: row.google_etag,
-      });
-      await updateRows('events', { id: 'eq.' + row.id, user_id: 'eq.' + user.id, etag: 'eq.' + row.etag },
-        { source: 'google', sync_status: 'synced', google_etag: remote.etag, last_sync_error: null });
-    } catch (error) {
-      await updateRows('events', { id: 'eq.' + row.id, user_id: 'eq.' + user.id },
-        { sync_status: 'error', last_sync_error: error.message.slice(0, 1000) });
+async function syncPendingEvents(force = false) {
+  if (!status.connected || !user) return { synced: 0, failed: 0 };
+  if (syncPromise) return syncPromise;
+  if (!force && Date.now() - lastSyncAttempt < 5 * 60_000) return { synced: 0, failed: 0 };
+  const syncUserId = user.id;
+  lastSyncAttempt = Date.now();
+  syncPromise = (async () => {
+    const pending = await selectRows('events', {
+      select: '*', user_id: 'eq.' + syncUserId,
+      sync_status: 'in.(local_only,pending,error)', order: 'updated_at.asc', limit: '25',
+    });
+    let synced = 0, failed = 0;
+    for (const row of pending) {
+      if (!user || user.id !== syncUserId || !status.connected) break;
+      let current = row;
+      try {
+        if (row.google_event_id) {
+          const remote = await api('google/events/' + encodeURIComponent(row.google_event_id), 'PATCH', {
+            ...googleBodyFromRow(row), etag: row.google_etag,
+          });
+          const saved = await updateRows('events', {
+            id: 'eq.' + row.id, user_id: 'eq.' + syncUserId, etag: 'eq.' + row.etag,
+          }, { source: 'google', sync_status: 'synced', google_etag: remote.etag, last_sync_error: null });
+          if (saved.length) synced++;
+        } else {
+          const claimed = await updateRows('events', {
+            id: 'eq.' + row.id, user_id: 'eq.' + syncUserId, etag: 'eq.' + row.etag,
+          }, { sync_status: 'pending', last_sync_error: null });
+          if (!claimed.length) continue;
+          current = claimed[0];
+          const linkId = await ensureGoogleLink();
+          const remote = await api('google/events', 'POST', {
+            ...googleBodyFromRow(current), id: current.id.replaceAll('-', ''),
+          });
+          const saved = await updateRows('events', {
+            id: 'eq.' + current.id, user_id: 'eq.' + syncUserId, etag: 'eq.' + current.etag,
+          }, {
+            source: 'google', sync_status: 'synced', google_link_id: linkId,
+            google_event_id: remote.id, google_etag: remote.etag, last_sync_error: null,
+          });
+          if (saved.length) synced++;
+        }
+      } catch (error) {
+        failed++;
+        if (!user || user.id !== syncUserId) break;
+        await updateRows('events', {
+          id: 'eq.' + current.id, user_id: 'eq.' + syncUserId, etag: 'eq.' + current.etag,
+        }, { sync_status: 'error', last_sync_error: error.message.slice(0, 1000) })
+          .catch(() => {});
+        if ([401, 409, 502, 503].includes(error.status)) break;
+      }
     }
-  }
+    return { synced, failed, more: pending.length === 25 };
+  })();
+  try { return await syncPromise; }
+  finally { syncPromise = null; }
 }
 function range() {
   if (screen === 'dashboard') return [today(), shift(today(), 8)];
@@ -243,13 +283,19 @@ async function load() {
     });
     if (key !== request) return;
     events = rows.map(fromDb);
-    message('warning', '');
+    const unsynced = status.connected && rows.some(row => row.sync_status !== 'synced');
+    message('warning', unsynced
+      ? 'Há compromissos aguardando o Google. Use Sincronizar Google para tentar novamente.' : '');
     if (status.connected) {
       try {
         const result = await api('google/events?' + new URLSearchParams({ from, to }));
         if (key !== request) return;
         const byGoogleId = new Map(rows.filter(row => row.google_event_id).map(row => [row.google_event_id, row]));
-        const remote = (result.events || []).map(item => fromGoogle(item, byGoogleId.get(item.id) || null));
+        const remote = (result.events || []).map(item => {
+          const row = byGoogleId.get(item.id);
+          return row && ['pending', 'error'].includes(row.sync_status)
+            ? fromDb(row) : fromGoogle(item, row || null);
+        });
         const remoteIds = new Set((result.events || []).map(item => item.id));
         events = [...remote, ...rows.filter(row => !row.google_event_id || !remoteIds.has(row.google_event_id)).map(fromDb)];
       } catch (error) {
@@ -330,6 +376,9 @@ function eventButton(e) {
   el.dataset.attendance = e.attendanceStatus || 'scheduled';
   if (e.attendanceStatus && e.attendanceStatus !== 'scheduled') {
     el.append(make('span', 'event-status', attendanceNames[e.attendanceStatus]));
+  }
+  if (status.connected && ['error', 'pending', 'local_only'].includes(e.syncStatus)) {
+    el.append(make('span', 'event-sync', 'Aguardando Google'));
   }
   el.setAttribute('aria-label', e.title + ', ' + labelTime(e) + ', ' + categoryNames[e.category]);
   el.title = e.title + ' · ' + categoryNames[e.category];
@@ -479,6 +528,9 @@ function dashboardEvent(e, dateLabel = '') {
   const category = make('span', 'category-label ' + (e.category || 'unassigned'),
     e.category ? categoryNames[e.category] : 'Sem categoria');
   item.append(heading, detail, category);
+  if (status.connected && ['error', 'pending', 'local_only'].includes(e.syncStatus)) {
+    detail.append(' · Aguardando Google');
+  }
   const row = make('div', 'dashboard-event-row');
   row.dataset.attendance = e.attendanceStatus || 'scheduled';
   const action = button(attendanceNames[e.attendanceStatus || 'scheduled'], () => showAttendance(e), 'status-trigger');
@@ -587,6 +639,19 @@ function setDateFields(allDay, start, end) {
   field('end').value = end;
   $('end-label').querySelector('span').textContent = allDay ? 'Último dia' : 'Fim';
 }
+function showConflict() {
+  if (!editor.open || field('start').disabled) return;
+  const allDay = field('allDay').checked;
+  const rawStart = field('start').value, rawEnd = field('end').value;
+  if (!rawStart || !rawEnd) { message('conflict-hint', ''); return; }
+  const start = allDay ? rawStart : iso(rawStart);
+  const end = allDay ? shift(rawEnd, 1) : iso(rawEnd);
+  if (!start || !end || start >= end) { message('conflict-hint', ''); return; }
+  const conflicts = overlappingAppointments({ start, end, allDay }, events, active);
+  message('conflict-hint', conflicts.length
+    ? 'Atenção: este horário coincide com ' + conflicts[0].title +
+      (conflicts.length > 1 ? ' e mais ' + (conflicts.length - 1) + ' compromisso(s).' : '.') : '');
+}
 function openEditor(event = null, day = selected, startMinute = 9 * 60) {
   active = event;
   pendingStatus = event?.attendanceStatus || 'scheduled';
@@ -612,13 +677,33 @@ function openEditor(event = null, day = selected, startMinute = 9 * 60) {
   setDateFields(field('allDay').checked, event ? event.allDay ? event.start : clock(event.start) : slotTime(day, startMinute),
     event ? event.allDay ? shift(event.end, -1) : clock(event.end) : slotTime(day, startMinute + slotMinutes));
   $('delete').hidden = !event || locked;
+  $('duplicate').hidden = !event;
   $('editor-attendance-row').hidden = !event;
   $('editor-attendance').textContent = attendanceNames[pendingStatus];
   $('delete').textContent = 'Excluir';
   $('save').hidden = locked;
   message('form-message', '');
   editor.showModal();
+  showConflict();
 }
+$('duplicate').onclick = () => {
+  if (!active) return;
+  active = null;
+  draftId = crypto.randomUUID();
+  pendingStatus = 'scheduled';
+  for (const el of form.querySelectorAll('input,textarea')) el.disabled = false;
+  $('editor-title').textContent = 'Duplicar compromisso';
+  $('source').textContent = 'Revise a data e o horário antes de salvar.';
+  $('delete').hidden = true;
+  $('save').hidden = false;
+  $('duplicate').hidden = true;
+  $('editor-attendance-row').hidden = true;
+  message('form-message', '');
+  showConflict();
+  field('start').focus();
+};
+form.addEventListener('input', showConflict);
+form.addEventListener('change', showConflict);
 $('editor-attendance').onclick = () => showAttendance(active);
 function showAttendance(event) {
   if (!event) return;
@@ -675,7 +760,7 @@ for (const choice of document.querySelectorAll('button[data-attendance]')) choic
   finally { choice.disabled = false; }
 };
 function busy(value) {
-  $('save').disabled = $('delete').disabled = value;
+  $('save').disabled = $('delete').disabled = $('duplicate').disabled = value;
   for (const el of editor.querySelectorAll('[data-close]')) el.disabled = value;
 }
 field('allDay').addEventListener('change', () => {
@@ -806,6 +891,8 @@ $('delete').onclick = async () => {
 };
 
 function settings() {
+  $('sync-now').hidden = !status.connected;
+  $('sync-settings').hidden = !status.connected;
   $('google-label').textContent = status.connected ? 'Google conectado' : 'Google Agenda';
   $('connect').textContent = status.connected ? 'Desconectar' : 'Conectar ao Google';
   $('connect').disabled = !status.ready;
@@ -815,6 +902,10 @@ function settings() {
       : 'Configure as credenciais OAuth seguindo o README para ativar a sincronização. A agenda Tu Agendando já salva seus compromissos na nuvem.';
 }
 $('google').onclick = () => { settings(); $('settings').showModal(); };
+$('sync-settings').onclick = () => {
+  $('settings').close();
+  $('sync-now').click();
+};
 $('connect').onclick = async () => {
   $('connect').disabled = true;
   message('google-error', '');
@@ -854,6 +945,34 @@ $('dashboard-tab').onclick = showDashboard;
 $('calendar-tab').onclick = () => showCalendar(today(), 'week');
 $('today-calendar').onclick = () => showCalendar(today(), 'day');
 $('reload').onclick = load;
+$('export-ics').onclick = () => {
+  if (!loaded) { notify('Aguarde a agenda carregar antes de exportar.'); return; }
+  const items = visible();
+  if (!items.length) { notify('Não há compromissos neste período para exportar.'); return; }
+  const [start, end] = range();
+  const blob = new Blob([calendarIcs(items)], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'tu-agendando-' + start + '-a-' + shift(end, -1) + '.ics';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+};
+$('sync-now').onclick = async () => {
+  const control = $('sync-now');
+  control.disabled = true;
+  control.textContent = 'Sincronizando...';
+  try {
+    const result = await syncPendingEvents(true);
+    await load();
+    notify(result.failed ? 'Uma sincronização falhou. Confira a conexão com o Google.' :
+      result.more ? result.synced + ' sincronizados. Repita para continuar.' :
+        result.synced ? result.synced + ' compromissos sincronizados.' : 'Agenda sincronizada.');
+  } catch (error) { notify('Não foi possível sincronizar: ' + error.message); }
+  finally { control.disabled = false; control.textContent = 'Sincronizar Google'; }
+};
 $('filters').onchange = render;
 $('search').oninput = render;
 compact.addEventListener('change', render);
@@ -865,7 +984,11 @@ function navigate(step) {
 $('back').onclick = () => navigate(-1);
 $('forward').onclick = () => navigate(1);
  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-setInterval(() => { if (!document.hidden && status.connected) load(); }, 60000);
+setInterval(async () => {
+  if (document.hidden || !status.connected) return;
+  try { await syncPendingEvents(); } catch { /* O próximo ciclo oferece nova tentativa. */ }
+  await load();
+}, 60000);
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; $('install').hidden = false; });
 $('install').onclick = async () => { if (installPrompt) await installPrompt.prompt(); $('install').hidden = true; };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -931,6 +1054,7 @@ async function startApp(account) {
     calendars = Object.fromEntries(rows.map(row => [row.kind, row]));
     if (!calendars.pf || !calendars.pj) throw new Error('As agendas pessoal e profissional não foram inicializadas.');
     status = await api('google/status');
+    $('sync-now').hidden = !status.connected;
     if (status.connected) {
       try { await ensureGoogleLink(); } catch (error) {
         message('warning', 'O Google está conectado, mas o vínculo não pôde ser atualizado: ' + error.message);

@@ -27,7 +27,7 @@ if (manifest.name !== 'Tu Agendando' ||
   throw new Error('Configuração da hospedagem incompleta.');
 }
 for (const path of [
-  'public/index.html', 'public/app.js', 'public/supabase.js', 'public/style.css',
+  'public/index.html', 'public/app.js', 'public/supabase.js', 'public/calendar-utils.js', 'public/style.css',
   'public/sw.js', 'public/brand-logo.png', 'api/config.js', 'api/google/status.js',
   'api/oauth-callback.js', 'lib/google-api.js',
 ]) {

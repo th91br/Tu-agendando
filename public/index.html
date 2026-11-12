@@ -83,7 +83,7 @@
     <p id="calendar-hint" class="calendar-hint"></p>
     <div id="calendar" aria-label="Compromissos"></div>
   </div>
-  <footer><span>Horário de Brasília</span><button id="reload"><span data-icon="refresh"></span> Atualizar agenda</button></footer>
+  <footer><span>Horário de Brasília</span><div class="footer-actions"><button id="export-ics" type="button">Exportar calendário</button><button id="sync-now" type="button" hidden>Sincronizar Google</button><button id="reload" type="button"><span data-icon="refresh"></span> Atualizar agenda</button></div></footer>
   </section>
 </main>
 </div>
@@ -94,11 +94,12 @@
   <fieldset><legend>Agenda</legend><div class="categories"><label><input required type="radio" name="category" value="pf"><i class="dot pf"></i>Pessoal · PF</label><label><input required type="radio" name="category" value="pj"><i class="dot pj"></i>Profissional · PJ</label></div></fieldset>
   <label class="check"><input type="checkbox" name="allDay"> Dia inteiro</label>
   <div class="dates"><label>Início<input name="start" required></label><label id="end-label"><span>Fim</span><input name="end" required></label></div>
+  <p id="conflict-hint" class="conflict-hint" role="status" hidden></p>
   <label>Local<input name="location" maxlength="300"></label>
   <label>Observações<textarea name="notes" rows="2" maxlength="4000"></textarea></label>
   <div id="editor-attendance-row" class="editor-attendance-row" hidden><span>Situação</span><button id="editor-attendance" type="button" class="status-trigger"></button></div>
   <p id="form-message" class="warning" role="alert" hidden></p>
-  <div class="dialog-actions"><button class="danger" type="button" id="delete" hidden>Excluir</button><button type="button" data-close="editor">Cancelar</button><button class="create" id="save">Salvar</button></div>
+  <div class="dialog-actions"><button class="danger" type="button" id="delete" hidden>Excluir</button><button type="button" id="duplicate" hidden>Duplicar</button><button type="button" data-close="editor">Cancelar</button><button class="create" id="save">Salvar</button></div>
 </form></dialog>
 <dialog id="attendance-dialog" aria-labelledby="attendance-title"><div class="attendance-panel">
   <div class="dialog-head"><h2 id="attendance-title">Situação do compromisso</h2><button type="button" data-close="attendance-dialog" aria-label="Fechar" data-icon="close"></button></div>
@@ -115,7 +116,7 @@
 <dialog id="settings" aria-labelledby="settings-title"><div class="settings">
   <div class="dialog-head"><h2 id="settings-title">Google Agenda</h2><button type="button" data-close="settings" aria-label="Fechar" data-icon="close"></button></div>
   <p id="google-info"></p><p id="google-error" class="warning" role="alert" hidden></p><p id="legacy-info" class="legacy-info" hidden></p>
-  <div class="dialog-actions"><button id="install" hidden>Instalar aplicativo</button><button id="legacy-import" type="button" hidden>Importar compromissos antigos</button><button class="create" id="connect"></button></div>
+  <div class="dialog-actions"><button id="install" hidden>Instalar aplicativo</button><button id="legacy-import" type="button" hidden>Importar compromissos antigos</button><button id="sync-settings" type="button" hidden>Sincronizar agora</button><button class="create" id="connect"></button></div>
 </div></dialog>
 <p id="notice" role="status" class="toast" hidden></p>
 </body></html>
