@@ -4,7 +4,8 @@ Agenda pessoal e profissional (PF/PJ), responsiva e instalável como PWA. O fron
 
 ## Funcionalidades
 
-- Painel com próximos compromissos; calendário em dia, semana e mês; cadastro ao selecionar um horário.
+- Painel com próximos compromissos; calendário em quadro semanal, dia, semana e mês; cadastro ao selecionar um horário.
+- Quadro de segunda a domingo, cartões ordenados por horário, marcações de situação e avisos de sobreposição. Remarcações por arraste passam pelo editor antes de salvar.
 - Busca, filtros PF/PJ, edição, exclusão e controle de conflito entre sessões.
 - OAuth Google com PKCE, sincronização do calendário principal e credenciais restritas ao servidor.
 - PWA com cache da interface. Os compromissos exigem conexão; dados pessoais não entram no cache do service worker.
@@ -13,7 +14,7 @@ Agenda pessoal e profissional (PF/PJ), responsiva e instalável como PWA. O fron
 
 O repositório `th91br/Tu-agendando` está preparado para importação em uma conta Vercel. As instruções e variáveis estão em [VERCEL.md](VERCEL.md). A migração SQL `20261110001754_vercel_google_oauth_rpc.sql` já foi aplicada ao projeto Supabase `lfxqpoccydzlyrtqejpp`.
 
-O build (`npm run build`) valida a sintaxe e executa os testes. Arquivos estáticos estão em `public/`; as funções em `api/`. O endpoint `/api/health` permite conferir o ambiente após a publicação sem expor segredos.
+Execute `npm ci` para instalar as dependências de desenvolvimento. O build (`npm run build`) valida a sintaxe e executa os testes, incluindo a integração DOM do quadro semanal com dados simulados. Esses testes não substituem inspeção visual nem acesso real ao Google. Arquivos estáticos estão em `public/`; as funções em `api/`. O endpoint `/api/health` permite conferir o ambiente após a publicação sem expor segredos.
 
 ## Desenvolvimento local
 

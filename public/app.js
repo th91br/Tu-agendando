@@ -59,15 +59,18 @@ const seven = start => Array.from({ length: 7 }, (_, i) => shift(start, i));
 const fortyTwo = start => Array.from({ length: 42 }, (_, i) => shift(start, i));
 
 let selected = today(), miniMonth = monthStep(selected, 0);
-let view = 'week', screen = 'dashboard', events = [], active = null, draftId = null, status = { ready: false, connected: false };
+let view = 'board', screen = 'dashboard', events = [], active = null, draftId = null, status = { ready: false, connected: false };
 let user = null, calendars = {}, googleLinkId = null, legacyCount = 0, authMode = 'signin';
 let request = 0, noticeTimer, installPrompt, loaded = false, currentWindow = '';
 let deleteArmed = false, pendingStatus = 'scheduled', attendanceEvent = null;
 let syncPromise = null, lastSyncAttempt = 0;
+let loadFailed = false, draggedEvent = null, draggedFromDay = null;
+const statusWrites = new Set();
 const attendanceNames = {
   scheduled: 'Planejado', completed: 'Concluído', missed: 'Faltei',
   no_show: 'Não compareceu', rescheduled: 'Remarcado',
 };
+const attendanceLabels = attendanceNames;
 const categoryNames = { pf: 'PF', pj: 'PJ', '': 'Sem categoria' };
 const daysOfWeek = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const editor = $('editor'), form = $('event-form'), field = name => form.elements.namedItem(name);
@@ -259,7 +262,7 @@ async function syncPendingEvents(force = false) {
 function range() {
   if (screen === 'dashboard') return [today(), shift(today(), 8)];
   if (view === 'day') return [selected, shift(selected, 1)];
-  if (view === 'week') return [monday(selected), shift(monday(selected), 7)];
+  if (view === 'week' || view === 'board') return [monday(selected), shift(monday(selected), 7)];
   const start = monday(monthStep(selected, 0));
   return [start, shift(start, 42)];
 }
@@ -272,6 +275,7 @@ async function load() {
     currentWindow = windowId;
     events = [];
     loaded = false;
+    loadFailed = false;
     message('warning', '');
   }
   render();
@@ -283,6 +287,7 @@ async function load() {
     });
     if (key !== request) return;
     events = rows.map(fromDb);
+    loadFailed = false;
     const unsynced = status.connected && rows.some(row => row.sync_status !== 'synced');
     message('warning', unsynced
       ? 'Há compromissos aguardando o Google. Use Sincronizar Google para tentar novamente.' : '');
@@ -305,6 +310,7 @@ async function load() {
     }
   } catch (error) {
     if (key !== request) return;
+    loadFailed = true;
     message('warning', error instanceof TypeError ? 'Sem conexão com a agenda. Verifique se o Tu Agendando está em execução.' : error.message);
   }
   loaded = true;
@@ -316,7 +322,7 @@ function choose(day, nextView = view) {
   view = nextView;
   load();
 }
-function showCalendar(day = selected, nextView = 'day') {
+function showCalendar(day = selected, nextView = 'board') {
   selected = day;
   miniMonth = monthStep(day, 0);
   view = nextView;
@@ -344,7 +350,7 @@ function showDashboard() {
 }
 function updateSidebarToggle() {
   const collapsed = $('shell').dataset.sidebarCollapsed === 'true';
-  const label = collapsed ? 'Mostrar coluna lateral' : 'Recolher coluna lateral';
+  const label = collapsed ? 'Mostrar agendas e filtros' : 'Recolher agendas e filtros';
   $('sidebar-toggle').setAttribute('aria-expanded', String(!collapsed));
   $('sidebar-toggle').setAttribute('aria-label', label);
   $('sidebar-toggle').title = label;
@@ -520,6 +526,228 @@ function month(items) {
   }
   calendar.replaceChildren(grid);
 }
+function dayBounds(e, day) {
+  const start = Date.parse(iso(wallTime(day)));
+  const end = Date.parse(iso(wallTime(shift(day, 1))));
+  return [Math.max(start, Date.parse(e.start)), Math.min(end, Date.parse(e.end))];
+}
+function conflictsFor(items, day) {
+  const rows = items.filter(e => !e.allDay && !['missed', 'no_show'].includes(e.attendanceStatus))
+    .map(e => ({ e, bounds: dayBounds(e, day) })).sort((a, b) => a.bounds[0] - b.bounds[0]);
+  const overlaps = new Set();
+  for (let i = 0; i < rows.length; i++) {
+    for (let j = i + 1; j < rows.length && rows[j].bounds[0] < rows[i].bounds[1]; j++) {
+      overlaps.add(rows[i].e.id); overlaps.add(rows[j].e.id);
+    }
+  }
+  return overlaps;
+}
+function boardTime(e, day) {
+  if (e.allDay) return 'Dia inteiro';
+  const start = clock(e.start), end = clock(e.end);
+  const from = start.slice(0, 10) < day ? '00:00' : start.slice(11);
+  const to = end.slice(0, 10) > day ? '24:00' : end.slice(11);
+  return from + ' – ' + to;
+}
+function rescheduleEvent(e, day) {
+  if (e.locked) return;
+  const originalDay = e.allDay ? e.start : clock(e.start).slice(0, 10);
+  if (day === originalDay) return;
+  const offset = Math.round((date(day) - date(originalDay)) / 86400000);
+  openEditor(e);
+  if (e.allDay) setDateFields(true, day, shift(e.end, offset - 1));
+  else {
+    const start = clock(e.start), end = clock(e.end);
+    setDateFields(false, day + start.slice(10), shift(end.slice(0, 10), offset) + end.slice(10));
+  }
+  pendingStatus = 'rescheduled';
+  $('editor-attendance').textContent = attendanceNames.rescheduled;
+  showConflict();
+  message('form-message', 'Confira a nova data e o horário. A remarcação só será feita ao salvar.');
+}
+async function saveBoardAttendance(e, value, select) {
+  if (!e.dbId || e.locked || statusWrites.has(e.dbId) || !attendanceLabels[value]) return;
+  if (value === 'rescheduled') {
+    select.value = e.attendanceStatus || 'scheduled';
+    openEditor(e);
+    pendingStatus = 'rescheduled';
+    $('editor-attendance').textContent = attendanceNames.rescheduled;
+    message('form-message', 'Escolha a nova data ou horário e salve para remarcar.');
+    field('start').focus();
+    return;
+  }
+  const owner = user?.id;
+  if (!owner) return;
+  statusWrites.add(e.dbId);
+  select.disabled = true;
+  select.setAttribute('aria-busy', 'true');
+  try {
+    const rows = await updateRows('events', { id: 'eq.' + e.dbId, user_id: 'eq.' + owner, etag: 'eq.' + e.dbEtag }, { attendance_status: value });
+    if (!rows.length) throw new Error('Este compromisso mudou em outra sessão. Atualize a agenda antes de alterar o status.');
+    if (user?.id !== owner) return;
+    events = events.map(item => item.dbId === e.dbId ? { ...item, attendanceStatus: rows[0].attendance_status, dbEtag: rows[0].etag } : item);
+    render();
+    const replacement = [...calendar.querySelectorAll('.attendance-select')].find(el => el.dataset.eventId === e.id);
+    replacement?.focus({ preventScroll: true });
+    notify('Status atualizado: ' + attendanceLabels[value] + '.');
+  } catch (error) {
+    if (user?.id !== owner) return;
+    select.value = e.attendanceStatus || 'scheduled';
+    notify(error.message);
+  } finally {
+    statusWrites.delete(e.dbId);
+    select.disabled = false;
+    select.removeAttribute('aria-busy');
+    for (const el of calendar.querySelectorAll('.attendance-select')) {
+      if (el.dataset.eventId === e.id) el.disabled = !e.dbId || e.locked;
+    }
+  }
+}
+function boardCard(e, day, conflict) {
+  const attendance = e.attendanceStatus || 'scheduled';
+  const card = make('article', 'appointment-card ' + (e.category || 'unassigned') + ' status-' + attendance);
+  card.dataset.eventId = e.id;
+  card.setAttribute('aria-label', e.title + ', ' + boardTime(e, day));
+  const open = button('', () => openEditor(e), 'appointment-open');
+  open.setAttribute('aria-label', 'Editar ' + e.title + ', ' + boardTime(e, day));
+  const time = make('span', 'appointment-time', boardTime(e, day));
+  if (!e.allDay) {
+    const now = Date.now();
+    if (day === today() && Date.parse(e.start) <= now && Date.parse(e.end) > now && !['completed', 'missed', 'no_show'].includes(attendance)) {
+      time.append(make('span', 'live-indicator', 'Agora'));
+    }
+  }
+  open.append(time, make('strong', 'appointment-title', e.title));
+  if (e.location) open.append(make('span', 'appointment-location', e.location));
+  if (e.notes) open.append(make('span', 'appointment-notes', e.notes));
+  card.append(open);
+  if (status.connected && ['error', 'pending', 'local_only'].includes(e.syncStatus)) card.append(make('span', 'continuation-label', 'Aguardando Google'));
+  if (conflict) card.append(make('span', 'overlap-label', 'Horários sobrepostos'));
+  if (!e.allDay && (clock(e.start).slice(0, 10) < day || clock(e.end).slice(0, 10) > day)) {
+    card.append(make('span', 'continuation-label', 'Compromisso de mais de um dia'));
+  }
+  const footer = make('div', 'appointment-footer');
+  const category = make('span', 'board-category', e.category === 'pf' ? 'Pessoal' : e.category === 'pj' ? 'Profissional' : 'Sem categoria');
+  const select = make('select', 'attendance-select ' + attendance);
+  select.dataset.eventId = e.id;
+  select.setAttribute('aria-label', 'Status de ' + e.title);
+  for (const [value, text] of Object.entries(attendanceLabels)) {
+    const option = make('option', '', text); option.value = value; select.append(option);
+  }
+  select.value = attendance;
+  select.disabled = !e.dbId || e.locked || statusWrites.has(e.dbId);
+  if (!e.dbId) select.title = 'Abra e salve o compromisso na sua conta para marcar o status.';
+  select.addEventListener('change', () => saveBoardAttendance(e, select.value, select));
+  footer.append(category, select);
+  card.append(footer);
+  card.draggable = !e.locked;
+  card.addEventListener('dragstart', event => {
+    if (event.target.closest('select')) { event.preventDefault(); return; }
+    draggedEvent = e;
+    draggedFromDay = day;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', e.id);
+    card.classList.add('is-dragging');
+  });
+  card.addEventListener('dragend', () => {
+    draggedEvent = null;
+    draggedFromDay = null;
+    card.classList.remove('is-dragging');
+    calendar.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
+  });
+  return card;
+}
+function weeklyBoard(items) {
+  const start = monday(selected), days = seven(start);
+  const oldScroll = calendar.querySelector('.week-board');
+  const previousLeft = oldScroll?.dataset.week === start ? oldScroll.scrollLeft : null;
+  const wrapper = make('div', 'weekly-planner');
+  const overview = make('div', 'board-overview');
+  const intro = make('div');
+  intro.append(make('h2', '', 'Quadro semanal'), make('p', '', 'Seus dias organizados. Cada compromisso no seu lugar.'));
+  const counts = make('div', 'board-counts');
+  const done = items.filter(e => e.attendanceStatus === 'completed').length;
+  counts.append(make('span', '', items.length + (items.length === 1 ? ' compromisso' : ' compromissos')),
+    make('span', 'completed-count', done + (done === 1 ? ' concluído' : ' concluídos')));
+  overview.append(intro, counts);
+  const picker = make('div', 'board-day-picker');
+  picker.setAttribute('role', 'group'); picker.setAttribute('aria-label', 'Dias da semana');
+  const board = make('div', 'week-board');
+  board.dataset.week = start;
+  board.setAttribute('aria-label', 'Quadro de segunda a domingo');
+  board.tabIndex = 0;
+  const selectDay = day => {
+    selected = day;
+    for (const el of picker.children) el.setAttribute('aria-pressed', String(el.dataset.day === day));
+  };
+  for (let index = 0; index < days.length; index++) {
+    const day = days[index], dayItems = items.filter(e => eventOn(e, day))
+      .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.localeCompare(b.start));
+    const conflicts = conflictsFor(dayItems, day);
+    const lane = make('section', 'board-day' + (day === today() ? ' is-today' : '') + (index > 4 ? ' is-weekend' : ''));
+    lane.dataset.day = day;
+    const headingId = 'board-day-' + day;
+    lane.setAttribute('aria-labelledby', headingId);
+    const pick = button('', () => {
+      selectDay(day);
+      board.scrollTo({ left: lane.offsetLeft - board.offsetLeft, behavior: 'instant' });
+    }, day === today() ? 'is-today' : '');
+    pick.dataset.day = day;
+    pick.setAttribute('aria-label', format(day, { dateStyle: 'full' }) + ', ' + dayItems.length + ' compromissos');
+    pick.setAttribute('aria-pressed', String(day === selected));
+    pick.append(make('span', '', daysOfWeek[index]), make('strong', '', String(Number(day.slice(-2)))));
+    if (dayItems.length) pick.append(make('i', 'day-has-events'));
+    picker.append(pick);
+    const head = make('header', 'board-day-head');
+    const heading = make('div', 'board-day-heading');
+    const name = make('h3', '', cap(format(day, { weekday: 'long' }))); name.id = headingId;
+    heading.append(name, make('span', 'day-date', format(day, { day: '2-digit', month: 'short' }).replace('.', '')));
+    if (day === today()) heading.append(make('span', 'today-badge', 'Hoje'));
+    const add = button('+', () => openEditor(null, day), 'day-add');
+    add.setAttribute('aria-label', 'Novo compromisso em ' + format(day, { dateStyle: 'full' }));
+    head.append(heading, add);
+    const meta = make('div', 'day-meta', !loaded ? 'Carregando…' : dayItems.length ? dayItems.length + (dayItems.length === 1 ? ' compromisso' : ' compromissos') : loadFailed ? 'Falha ao carregar' : 'Sem compromissos');
+    const list = make('div', 'day-appointments');
+    list.append(...dayItems.map(e => boardCard(e, day, conflicts.has(e.id))));
+    if (!dayItems.length) {
+      const empty = make('div', 'day-empty');
+      empty.append(make('span', 'empty-symbol', !loaded ? '· · ·' : '+'),
+        make('p', '', !loaded ? 'Buscando seus compromissos' : loadFailed ? 'Atualize a agenda para tentar novamente.' : 'Espaço para seus planos'));
+      list.append(empty);
+    }
+    const create = button('+ Agendar', () => openEditor(null, day), 'board-add');
+    create.setAttribute('aria-label', 'Agendar compromisso em ' + format(day, { dateStyle: 'full' }));
+    lane.append(head, meta, list, create);
+    lane.addEventListener('dragover', event => {
+      if (!draggedEvent) return;
+      event.preventDefault(); event.dataTransfer.dropEffect = 'move'; lane.classList.add('is-drop-target');
+    });
+    lane.addEventListener('dragleave', event => { if (!lane.contains(event.relatedTarget)) lane.classList.remove('is-drop-target'); });
+    lane.addEventListener('drop', event => {
+      event.preventDefault(); lane.classList.remove('is-drop-target');
+      if (draggedEvent && draggedFromDay !== day) rescheduleEvent(draggedEvent, day);
+      draggedEvent = null;
+      draggedFromDay = null;
+    });
+    board.append(lane);
+  }
+  let scrollFrame;
+  board.addEventListener('scroll', () => {
+    cancelAnimationFrame(scrollFrame);
+    scrollFrame = requestAnimationFrame(() => {
+      if (board.scrollWidth <= board.clientWidth + 2) return;
+      const target = [...board.children].reduce((a, b) => Math.abs(a.offsetLeft - board.offsetLeft - board.scrollLeft) < Math.abs(b.offsetLeft - board.offsetLeft - board.scrollLeft) ? a : b);
+      selectDay(target.dataset.day);
+    });
+  }, { passive: true });
+  wrapper.append(overview, picker, board);
+  calendar.replaceChildren(wrapper);
+  if (previousLeft !== null) board.scrollLeft = previousLeft;
+  else {
+    const target = [...board.children].find(el => el.dataset.day === selected);
+    if (target) board.scrollLeft = target.offsetLeft - board.offsetLeft;
+  }
+}
 function dashboardEvent(e, dateLabel = '') {
   const item = button('', () => openEditor(e), 'dashboard-event');
   const heading = make('strong', '', e.title);
@@ -612,6 +840,7 @@ function renderDashboard() {
   }
 }
 function render() {
+  $('shell').dataset.view = view;
   if (screen === 'dashboard') {
     renderDashboard();
     return;
@@ -629,8 +858,9 @@ function render() {
     (e.allDay ? e.start >= today() : Date.parse(e.start) >= Date.now()));
   $('upcoming').replaceChildren(next ? button(next.title + ' · ' + labelTime(next), () => openEditor(next)) :
     make('p', '', 'Nenhum compromisso à frente neste período.'));
-  $('calendar-hint').textContent = view === 'month' ? 'Selecione um dia para marcar.' : 'Selecione um horário na grade para marcar.';
-  if (view === 'month') month(items);
+  $('calendar-hint').textContent = view === 'board' ? 'Compromissos em ordem de horário. Edite um cartão para remarcar ou arraste para outro dia e revise antes de salvar.' : view === 'month' ? 'Selecione um dia para marcar.' : 'Selecione um horário na grade para marcar.';
+  if (view === 'board') weeklyBoard(items);
+  else if (view === 'month') month(items);
   else timeline(items);
 }
 function setDateFields(allDay, start, end) {
@@ -942,7 +1172,7 @@ $('today').onclick = () => choose(today());
 $('new').onclick = () => openEditor();
 $('dashboard-new').onclick = () => openEditor(null, today());
 $('dashboard-tab').onclick = showDashboard;
-$('calendar-tab').onclick = () => showCalendar(today(), 'week');
+$('calendar-tab').onclick = () => showCalendar(selected, 'board');
 $('today-calendar').onclick = () => showCalendar(today(), 'day');
 $('reload').onclick = load;
 $('export-ics').onclick = () => {
@@ -979,14 +1209,14 @@ compact.addEventListener('change', render);
 $('mini-back').onclick = () => { miniMonth = monthStep(miniMonth, -1); mini(); };
 $('mini-next').onclick = () => { miniMonth = monthStep(miniMonth, 1); mini(); };
 function navigate(step) {
-  choose(view === 'month' ? monthStep(selected, step) : shift(selected, view === 'week' ? 7 * step : step));
+  choose(view === 'month' ? monthStep(selected, step) : shift(selected, view === 'week' || view === 'board' ? 7 * step : step));
 }
 $('back').onclick = () => navigate(-1);
 $('forward').onclick = () => navigate(1);
  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 setInterval(async () => {
-  if (document.hidden || !status.connected) return;
-  try { await syncPendingEvents(); } catch { /* O próximo ciclo oferece nova tentativa. */ }
+  if (document.hidden || !user) return;
+  try { if (status.connected) await syncPendingEvents(); } catch { /* O próximo ciclo oferece nova tentativa. */ }
   await load();
 }, 60000);
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; $('install').hidden = false; });
@@ -1043,6 +1273,10 @@ async function startApp(account) {
   loaded = false;
   screen = 'dashboard';
   $('shell').dataset.screen = screen;
+  $('dashboard-screen').hidden = false;
+  $('calendar-screen').hidden = true;
+  $('calendar-tab').removeAttribute('aria-current');
+  $('dashboard-tab').setAttribute('aria-current', 'page');
   $('auth-screen').hidden = true;
   $('shell').hidden = false;
   $('user-email').textContent = account.email || '';
@@ -1053,7 +1287,8 @@ async function startApp(account) {
     });
     calendars = Object.fromEntries(rows.map(row => [row.kind, row]));
     if (!calendars.pf || !calendars.pj) throw new Error('As agendas pessoal e profissional não foram inicializadas.');
-    status = await api('google/status');
+    try { status = await api('google/status'); }
+    catch { status = { ready: false, connected: false }; }
     $('sync-now').hidden = !status.connected;
     if (status.connected) {
       try { await ensureGoogleLink(); } catch (error) {

@@ -1,4 +1,4 @@
-const cacheName = 'tu-agendando-v8';
+const cacheName = 'tu-agendando-v9-weekly-board';
 const shell = ['/', '/style.css', '/app.js', '/supabase.js', '/calendar-utils.js', '/brand-logo.png', '/icon.svg', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 self.addEventListener('install', event => event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(shell))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys

@@ -24,7 +24,7 @@
     <button id="auth-submit" class="create" type="submit">Entrar</button>
   </form>
   <button id="auth-toggle" class="auth-toggle" type="button">Criar uma conta</button>
-</div></section><div class="shell" id="shell" data-screen="dashboard" hidden>
+</div></section><div class="shell" id="shell" data-screen="dashboard" data-sidebar-collapsed="true" hidden>
 <header class="top">
   <a class="brand" href="/" aria-label="Tu Agendando"><img class="brand-logo" src="/brand-logo.png" alt="Tu Agendando"></a>
   <label class="search"><span data-icon="search"></span><input id="search" type="search" placeholder="Buscar nos próximos 7 dias" aria-label="Buscar nos próximos 7 dias"></label>
@@ -45,9 +45,9 @@
 </aside>
 <main>
   <nav class="main-nav" aria-label="Navegação principal">
-    <button id="sidebar-toggle" type="button" class="sidebar-toggle" aria-controls="calendar-sidebar" aria-expanded="true" aria-label="Recolher coluna lateral" data-icon="panel"></button>
     <button id="dashboard-tab" aria-current="page">Painel</button>
     <button id="calendar-tab">Calendário</button>
+    <button id="sidebar-toggle" type="button" class="sidebar-toggle" aria-controls="calendar-sidebar" aria-expanded="false" aria-label="Mostrar agendas e filtros"><span data-icon="panel"></span><span>Agendas e filtros</span></button>
   </nav>
   <section id="dashboard-screen" class="dashboard-screen" aria-labelledby="dashboard-title">
     <div class="dashboard-heading">
@@ -77,7 +77,7 @@
   <div class="panel calendar">
     <div class="calendar-top">
       <div class="navigation"><button id="back" aria-label="Período anterior" data-icon="left"></button><button id="today">Hoje</button><button id="forward" aria-label="Próximo período" data-icon="right"></button></div>
-      <div class="views" aria-label="Visualização"><button data-view="day">Dia</button><button data-view="week">Semana</button><button data-view="month">Mês</button></div>
+      <div class="views" role="group" aria-label="Visualização do calendário"><button data-view="board">Quadro semanal</button><button data-view="day">Dia</button><button data-view="week">Semana</button><button data-view="month">Mês</button></div>
     </div>
     <p id="warning" class="warning" role="status" hidden></p>
     <p id="calendar-hint" class="calendar-hint"></p>

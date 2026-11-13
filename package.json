@@ -12,5 +12,8 @@
     "test": "node --test",
     "build": "npm run check && npm test",
     "dev": "node --env-file-if-exists=.env server.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
   }
 }

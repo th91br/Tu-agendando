@@ -200,3 +200,87 @@ dialog{width:min(510px,calc(100% - 24px));max-height:calc(100dvh - 24px);border:
   .top .search{grid-row:3;width:100%;margin:0}
   .dashboard-event-row .status-trigger{font-size:11px;padding:0 6px}
 }
+
+/* Weekly planner: time-ordered appointments, Monday through Sunday. */
+button,input,textarea,select{font:inherit}
+select{color:var(--ink)}
+select:focus-visible{outline:2px solid #cc6500;outline-offset:2px}
+form>label select{width:100%;border:1px solid #b8c7d3;border-radius:8px;min-height:44px;padding:8px;background:#fff}
+main{min-width:0}
+.shell[data-screen=calendar][data-sidebar-collapsed=true] .layout{grid-template-columns:minmax(0,1fr)}
+.main-nav{align-items:center}
+.main-nav .sidebar-toggle{width:auto;min-width:44px;margin-left:auto;display:flex;gap:8px;align-items:center;font-size:13px;padding:0 12px;color:#4d6072}
+.sidebar-toggle[aria-expanded=true]{background:#e3eaf1}
+.shell[data-view=board] .toolbar{background:transparent;padding:10px 2px 18px;margin-bottom:0}
+.shell[data-view=board] .toolbar h1{font-size:clamp(23px,2.25vw,32px)}
+.shell[data-view=board] .calendar{background:#fff;border:1px solid #dce4ec;box-shadow:0 2px 4px #102a4304}
+.shell[data-view=board] .calendar-top{padding:14px 18px}
+.views{background:#edf1f5}
+.views button{white-space:nowrap}
+.weekly-planner{padding:0 18px 18px}
+.board-overview{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 0}
+.board-overview h2{font-size:20px;letter-spacing:-.025em;line-height:1.2}
+.board-overview p{font-size:13px;line-height:1.5;color:#607184;margin-top:6px}
+.board-counts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;font-size:12px;white-space:nowrap}
+.board-counts>span{padding:7px 10px;border-radius:7px;background:#f0f3f6;color:#465b70}
+.board-counts .completed-count{background:#eaf5ef;color:#256544}
+.week-board{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:10px;align-items:stretch;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-color:#bdc9d3 #f1f4f7;scrollbar-width:thin;padding:2px 2px 12px;scroll-padding:2px}
+.board-day{min-width:0;display:flex;flex-direction:column;background:#f5f7f9;border:1px solid #e3e9ef;border-radius:12px;min-height:390px;scroll-snap-align:start;scroll-margin:2px;transition:border-color .15s}
+.board-day.is-today{background:#fffaf4;border-color:#eeb77d;box-shadow:0 0 0 1px #eeb77d33}
+.board-day.is-weekend{background:#f0f3f6}
+.board-day.is-weekend.is-today{background:#fffaf4}
+.board-day-head{display:flex;align-items:flex-start;justify-content:space-between;gap:2px;padding:14px 10px 8px;border-top:3px solid #becbd7;border-radius:11px 11px 0 0;min-height:91px}
+.is-today .board-day-head{border-top-color:#f58200}
+.board-day-heading{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0}
+.board-day-heading h3{font-size:13px;font-weight:750;letter-spacing:-.01em;line-height:1.3;margin:0;width:100%;overflow-wrap:anywhere}
+.day-date{font-size:23px;font-weight:650;letter-spacing:-.04em;line-height:1.1;white-space:nowrap}
+.today-badge{border-radius:5px;padding:3px 5px;background:#f58200;color:#102a43;font-weight:700;font-size:10px}
+.day-add{flex:none;display:grid;place-items:center;width:32px;min-height:44px;padding:0;font-size:23px;color:#758697;border-radius:7px;margin:-8px -5px 0 0}
+.day-add:hover{background:#e7edf3;color:#102a43}
+.day-meta{padding:0 10px 12px;font-size:11px;color:#6a7b8d;line-height:1.5;border-bottom:1px solid #e2e8ee}
+.day-appointments{display:grid;align-content:start;gap:10px;padding:10px 7px;flex:1}
+.appointment-card{min-width:0;border:1px solid #dee6ee;border-left:3px solid #274b6b;border-radius:9px;background:#fff;box-shadow:0 2px 3px #19324b06;overflow:hidden;align-self:start}
+.appointment-card.pj{border-left-color:#ed850e}
+.appointment-card.unassigned{border-left-color:#8d9caa}
+.appointment-card.status-completed{border-left-color:#3b8461}
+.appointment-card.status-missed,.appointment-card.status-no_show{border-left-color:#b26465}
+.appointment-open{display:grid;gap:9px;width:100%;min-height:0;text-align:left;padding:12px 9px 8px;border-radius:0;cursor:pointer}
+.appointment-open:hover{background:#f7f9fc}
+.appointment-time{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;line-height:1.45;color:#617286;font-weight:650}
+.appointment-title{font-size:13px;font-weight:700;line-height:1.5;overflow-wrap:anywhere;white-space:normal}
+.appointment-location{display:block;overflow-wrap:anywhere;font-size:11px;line-height:1.45;color:#66798b}
+.appointment-notes{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:11px;line-height:1.5;color:#768594;overflow-wrap:anywhere}
+.appointment-footer{display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:4px 9px 9px}
+.board-category{display:inline-flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;background:#edf2f8;color:#315574;font-size:10px;font-weight:650;line-height:1.4}
+.board-category::before{content:"";width:5px;height:5px;border-radius:50%;background:#315574;flex:none}
+.pj .board-category{background:#fff0de;color:#94520b}
+.pj .board-category::before{background:#d7770a}
+.attendance-select{width:100%;max-width:100%;min-width:0;min-height:44px;padding:5px 2px;border:0;border-top:1px solid #edf0f4;border-radius:0;background:#fff;color:#596c7f;font-size:11px;cursor:pointer;text-overflow:ellipsis}
+.attendance-select.completed{color:#286546}
+.attendance-select.missed,.attendance-select.no_show{color:#934d50}
+.attendance-select.rescheduled{color:#865312}
+.attendance-select:disabled{opacity:.65;cursor:default}
+.status-completed .appointment-title{color:#4a6559}
+.overlap-label,.continuation-label{display:block;margin:0 9px 8px;font-size:10px;line-height:1.5;color:#956113;background:#fff3dc;border-radius:4px;padding:4px 5px}
+.continuation-label{background:#edf2f7;color:#5c7186}
+.live-indicator{font-size:9px;background:#e3f2e9;color:#236c45;padding:2px 5px;border-radius:4px;font-weight:700}
+.board-add{margin:0 7px 8px;text-align:left;padding:0 9px;color:#758697;font-size:12px;min-height:44px;border:1px dashed transparent}
+.board-add:hover{background:#fff;border-color:#cbd6e0;color:#102a43}
+.day-empty{display:grid;align-content:center;justify-items:center;text-align:center;min-height:160px;gap:10px;padding:16px 5px;color:#8898a6}
+.empty-symbol{display:grid;place-items:center;border:1px dashed #c7d2dc;border-radius:50%;width:33px;height:33px;font-size:21px;font-weight:400;color:#9aa9b6}
+.day-empty p{font-size:11px;line-height:1.6;max-width:120px}
+.board-day.is-drop-target{background:#fff1df;border:1px dashed #db7e12;box-shadow:inset 0 0 0 1px #db7e12}
+.appointment-card.is-dragging{opacity:.4}
+.board-day-picker{display:none}
+.event.is-completed strong{color:#37684f}
+.shell[data-view=board] .calendar-hint{color:#6a7989;line-height:1.55;padding:10px 18px;background:#fbfcfd}
+@media(min-width:1500px){.board-day-heading h3{font-size:14px}.appointment-title{font-size:14px}.appointment-time{font-size:12px}.day-appointments{padding:12px 9px}.board-day-head{padding:15px 12px 8px}.day-meta{padding-left:12px}.appointment-footer{flex-direction:row;align-items:center;flex-wrap:wrap}.attendance-select{font-size:12px}.board-day{min-height:460px}}
+@media(min-width:1180px){.shell[data-screen=calendar]:not([data-sidebar-collapsed=true]) .week-board{grid-auto-columns:calc((100% - 30px)/4)}}
+@media(max-width:1179px){.week-board{grid-auto-columns:calc((100% - 20px)/3);gap:10px}.board-day-picker{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:0 0 14px}.board-day-picker button{position:relative;display:grid;justify-items:center;gap:3px;padding:7px 2px 12px;border:1px solid #e4eaf0;background:#f7f9fb;min-width:0;line-height:1.4}.board-day-picker span{font-size:11px;color:#708196}.board-day-picker strong{font-size:18px;font-weight:650}.board-day-picker [aria-pressed=true]{background:#102a43;border-color:#102a43;color:#fff}.board-day-picker [aria-pressed=true] span{color:#d6e0e8}.board-day-picker .is-today:not([aria-pressed=true]){border-color:#ecac64;background:#fff7ec}.day-has-events{position:absolute;bottom:5px;width:4px;height:4px;background:#e68a20;border-radius:50%}.board-day-head{min-height:90px}.appointment-title{font-size:14px}.appointment-time{font-size:12px}.appointment-footer{flex-direction:row;flex-wrap:wrap;align-items:center}.attendance-select{font-size:12px}.board-day{min-height:420px}}
+@media(max-width:899px){.week-board{grid-auto-columns:calc((100% - 12px)/2);gap:12px}.board-overview{align-items:flex-start;padding:18px 0;gap:10px}.board-overview p{max-width:250px}.board-counts{gap:6px}.board-counts>span{padding:6px 8px}.shell[data-view=board] .toolbar{padding:8px 0 14px}.shell[data-screen=calendar]:not([data-sidebar-collapsed=true]) .layout{display:flex;flex-direction:column}.sidebar{order:0}.shell[data-screen=calendar]:not([data-sidebar-collapsed=true]) .sidebar .mini{display:none}.shell[data-screen=calendar]:not([data-sidebar-collapsed=true]) .sidebar .upcoming{display:none}.shell[data-screen=calendar]:not([data-sidebar-collapsed=true]) .filters>div{display:flex;flex-wrap:wrap;gap:6px 14px}.shell[data-screen=calendar]:not([data-sidebar-collapsed=true]) .filters h2{display:none}}
+@media(max-width:599px){.shell{padding:0 12px 12px}.top{height:auto;min-height:70px;flex-wrap:wrap;gap:8px;padding:12px 0}.brand .brand-logo{width:164px;height:50px}.account-tools{max-width:calc(100% - 175px)}.account-tools .integration{padding:0 7px}.integration svg{display:none}#user-email{display:none}.search{order:3;flex-basis:100%;width:100%;margin:0}.main-nav button{flex:initial;padding:0 12px}.main-nav .sidebar-toggle{padding:0 8px}.sidebar-toggle span:last-child{font-size:0}.sidebar-toggle span:last-child::after{content:"Filtros";font-size:12px}.shell[data-view=board] .toolbar{gap:10px;align-items:center}.shell[data-view=board] .toolbar h1{font-size:21px}.toolbar .create{min-height:44px;font-size:12px;padding:0 9px}.toolbar .create span:last-child{font-size:0}.toolbar .create span:last-child::after{content:"Agendar";font-size:12px}.shell[data-view=board] .calendar-top{padding:10px;gap:8px;flex-wrap:wrap}.navigation{width:100%;justify-content:space-between}.navigation #today{font-weight:650;flex:1}.views{width:100%;justify-content:stretch}.views button{flex:1;padding:0 7px;font-size:12px}.views button[data-view=board]{flex:1.7}.weekly-planner{padding:0 10px 10px}.board-overview{flex-direction:column;gap:12px;padding:17px 2px}.board-overview h2{font-size:19px}.board-overview p{font-size:12px;max-width:none}.board-counts{justify-content:flex-start}.board-counts>span{font-size:11px}.board-day-picker{gap:4px}.board-day-picker button{border-radius:7px;min-height:64px}.board-day-picker span{font-size:10px}.board-day-picker strong{font-size:16px}.week-board{grid-auto-columns:100%;gap:10px}.board-day{min-height:350px}.board-day-head{min-height:76px;padding:13px 14px 8px}.board-day-heading h3{font-size:15px;width:auto;margin-right:4px}.day-date{font-size:21px}.today-badge{font-size:10px}.day-meta{padding:0 14px 11px;font-size:12px}.day-appointments{padding:12px;gap:12px}.appointment-open{padding:13px 12px 9px;gap:8px}.appointment-title{font-size:15px;line-height:1.5}.appointment-time{font-size:12px}.appointment-location,.appointment-notes{font-size:12px}.appointment-footer{flex-direction:row;flex-wrap:nowrap;gap:8px;padding:0 12px 9px}.board-category{font-size:11px;flex:none}.attendance-select{border:0;flex:1;min-width:0;text-align:right;font-size:12px}.overlap-label,.continuation-label{margin-left:12px;margin-right:12px;font-size:11px}.board-add{margin:0 12px 10px;font-size:13px}.day-empty{min-height:150px}.day-empty p{max-width:190px;font-size:12px}.shell[data-view=board] .calendar-hint{padding:10px 12px;font-size:11px}footer{font-size:11px;gap:3px}footer button{padding:0 3px;font-size:11px}}
+@media(prefers-reduced-motion:reduce){.board-day{transition:none}}
+
+@media(max-width:379px){.brand .brand-logo{width:145px}.account-tools{max-width:calc(100% - 153px)}#google-label{font-size:0}#google-label::after{content:"Google";font-size:12px}}
+
+@media(max-width:600px){.top{display:grid}.brand .brand-logo{width:clamp(205px,60vw,248px);height:auto;max-height:75px}.top .account-tools{max-width:none}.main-nav .sidebar-toggle{width:auto;min-width:44px}}
