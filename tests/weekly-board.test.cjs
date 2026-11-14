@@ -194,6 +194,16 @@ function row(app, id, day, start = '09:00', end = '10:00', extra = {}) {
     assert.match(w.document.querySelector('.day-meta').textContent, /Falha/);
     assert.equal(w.document.querySelector('#warning').hidden, false);
   });
+  await check('Session removal clears the authenticated interface and closes the event editor', async () => {
+    app.openEditor(null, app.today());
+    w.document.querySelector('#auth-password').value = 'temporary-input';
+    w.dispatchEvent(new w.CustomEvent('tu-agendando:auth', { detail: { user: null, reason: 'signed_out' } }));
+    assert.equal(app.user, null);
+    assert.equal(w.document.querySelector('#shell').hidden, true);
+    assert.equal(w.document.querySelector('#auth-screen').hidden, false);
+    assert.equal(w.document.querySelector('#editor').open, false);
+    assert.equal(w.document.querySelector('#auth-password').value, '');
+  });
   context.dom.window.close();
   for (const width of [820, 390]) {
     await check('All seven days and day picker remain navigable with compact state at ' + width, async () => {

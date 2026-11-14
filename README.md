@@ -8,6 +8,7 @@ Agenda pessoal e profissional (PF/PJ), responsiva e instalável como PWA. O fron
 - Quadro de segunda a domingo, cartões ordenados por horário, marcações de situação e avisos de sobreposição. Remarcações por arraste passam pelo editor antes de salvar.
 - Busca, filtros PF/PJ, edição, exclusão e controle de conflito entre sessões.
 - OAuth Google com PKCE, sincronização do calendário principal e credenciais restritas ao servidor.
+- Login persistente ao fechar e reabrir a PWA, com renovação automática da sessão. Sair remove a sessão deste dispositivo e das abas da mesma origem. A senha não é armazenada.
 - PWA com cache da interface. Os compromissos exigem conexão; dados pessoais não entram no cache do service worker.
 
 ## Publicação na Vercel

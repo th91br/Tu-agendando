@@ -1416,6 +1416,7 @@ $('auth-form').addEventListener('submit', async event => {
       message('auth-message', 'Confira seu e-mail para confirmar a conta e depois entre na agenda.');
       return;
     }
+    $('auth-password').value = '';
     await startApp(result.user);
   } catch (error) {
     message('auth-message', error.message);
@@ -1423,8 +1424,7 @@ $('auth-form').addEventListener('submit', async event => {
     submit.disabled = false;
   }
 });
-$('sign-out').onclick = async () => {
-  await signOut();
+function resetToSignIn(reason = '') {
   user = null;
   calendars = {};
   googleLinkId = null;
@@ -1433,12 +1433,24 @@ $('sign-out').onclick = async () => {
   active = null;
   loaded = false;
   request++;
+  for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('shell').hidden = true;
   $('auth-screen').hidden = false;
   $('auth-email').value = '';
   $('auth-password').value = '';
-  message('auth-message', '');
+  $('auth-confirm').value = '';
+  setAuthMode('signin');
+  message('auth-message', reason === 'expired' ? 'Sua sessão expirou. Entre novamente.' : '');
+}
+$('sign-out').onclick = () => {
+  const result = signOut();
+  resetToSignIn();
+  result.catch(() => {});
 };
+window.addEventListener('tu-agendando:auth', event => {
+  if (!event.detail?.user) resetToSignIn(event.detail?.reason);
+  else if (event.detail.user.id !== user?.id) startApp(event.detail.user);
+});
 $('legacy-import').onclick = importLegacy;
 if (consumeRecoveryLink()) setAuthMode('reset');
 else if (!isConfigured()) message('auth-message', 'A autenticação ainda precisa ser configurada no arquivo .env.');
